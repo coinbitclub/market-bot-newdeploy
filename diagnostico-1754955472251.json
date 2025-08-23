@@ -1,0 +1,96 @@
+{
+  "timestamp": "2025-08-11T23:37:52.235Z",
+  "url": "https://coinbitclub-market-bot-production.up.railway.app",
+  "resultados": {
+    "conectividade": {
+      "erro": "Request failed with status code 404",
+      "code": "ERR_BAD_REQUEST",
+      "sucesso": false
+    },
+    "geolocalizacao": {
+      "ip": "132.255.160.131",
+      "pais": "Brazil",
+      "regiao": "Rio de Janeiro",
+      "cidade": "Niterói",
+      "isp": "A.M.A TELECOM",
+      "bloqueado": false
+    },
+    "dns": {
+      "hostname": "coinbitclub-market-bot-production.up.railway.app",
+      "ips": [
+        "trestle.proxy.rlwy.net.",
+        "35.212.94.98"
+      ],
+      "sucesso": true
+    },
+    "endpoints": {
+      "/health": {
+        "status": 404,
+        "sucesso": false,
+        "data": null,
+        "erro": "HTTP 404"
+      },
+      "/": {
+        "status": 404,
+        "sucesso": false,
+        "data": null,
+        "erro": "HTTP 404"
+      },
+      "/api/system/status": {
+        "status": 404,
+        "sucesso": false,
+        "data": null,
+        "erro": "HTTP 404"
+      },
+      "/api/current-mode": {
+        "status": 404,
+        "sucesso": false,
+        "data": null,
+        "erro": "HTTP 404"
+      },
+      "/api/production-mode": {
+        "status": 404,
+        "sucesso": false,
+        "data": null,
+        "erro": "HTTP 404"
+      },
+      "/ativar-chaves-reais": {
+        "status": 404,
+        "sucesso": false,
+        "data": null,
+        "erro": "HTTP 404"
+      }
+    },
+    "railway": {
+      "erro": "Request failed with status code 404",
+      "status": 404,
+      "sucesso": false
+    },
+    "problemas": [
+      "Conectividade básica falhou",
+      "Railway erro: Request failed with status code 404",
+      "Endpoint /health retorna 404",
+      "Endpoint / retorna 404",
+      "Endpoint /api/system/status retorna 404",
+      "Endpoint /api/current-mode retorna 404",
+      "Endpoint /api/production-mode retorna 404",
+      "Endpoint /ativar-chaves-reais retorna 404"
+    ],
+    "ipFixo": {
+      "ips": [
+        "132.255.160.131",
+        "132.255.160.131",
+        "132.255.160.131"
+      ],
+      "ipFixo": true,
+      "ipAtual": "132.255.160.131"
+    },
+    "amostraEndpoints": {
+      "total": 10,
+      "sucessos": 0,
+      "falhas": 10,
+      "percentualSucesso": 0
+    }
+  },
+  "diagnostico": "CRITICO"
+}

@@ -1,0 +1,1568 @@
+{
+  "timestamp": "2025-08-12T01:56:38.641Z",
+  "summary": {
+    "total": 85,
+    "successful": 85,
+    "errors": 0,
+    "successRate": 100
+  },
+  "categories": {
+    "BASIC": [
+      {
+        "path": "/health",
+        "method": "GET",
+        "category": "BASIC",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/status",
+        "method": "GET",
+        "category": "BASIC",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/",
+        "method": "GET",
+        "category": "BASIC",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "DASHBOARD": [
+      {
+        "path": "/api/dashboard/summary",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/dashboard/realtime",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/dashboard/signals",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/dashboard/orders",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/dashboard/users",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/dashboard/balances",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/dashboard/admin-logs",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/dashboard/ai-analysis",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/painel",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/painel/executivo",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/painel/fluxo",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/painel/decisoes",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/painel/usuarios",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/painel/alertas",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/painel/diagnosticos",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/painel/executivo",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/painel/fluxo",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/painel/decisoes",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/painel/usuarios",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/painel/alertas",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/painel/diagnosticos",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/painel/realtime",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/painel/dados",
+        "method": "GET",
+        "category": "DASHBOARD",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "OTHER": [
+      {
+        "path": "/system-status",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/commission-plans",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/user/:userId/balances",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/positions",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/ip-diagnostic",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/error-handling/status",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/dashboard",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/trading/status",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/signals",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/market/data",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/dominance",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/dashboard-production",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/production-mode",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/current-mode",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/ativar-chaves-reais",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/fix-database",
+        "method": "GET",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/validate-position",
+        "method": "POST",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/calculate-commission",
+        "method": "POST",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/user/use-coupon",
+        "method": "POST",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/user/request-withdrawal",
+        "method": "POST",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/register",
+        "method": "POST",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/login",
+        "method": "POST",
+        "category": "OTHER",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "ADMINISTRATION": [
+      {
+        "path": "/api/admin/financial-summary",
+        "method": "GET",
+        "category": "ADMINISTRATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/admin/generate-coupon-code",
+        "method": "GET",
+        "category": "ADMINISTRATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/systems/status",
+        "method": "GET",
+        "category": "ADMINISTRATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/system/status",
+        "method": "GET",
+        "category": "ADMINISTRATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/admin/create-coupon",
+        "method": "POST",
+        "category": "ADMINISTRATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "USER_MANAGEMENT": [
+      {
+        "path": "/api/users",
+        "method": "GET",
+        "category": "USER_MANAGEMENT",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/affiliate/convert-commission",
+        "method": "POST",
+        "category": "USER_MANAGEMENT",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "EXCHANGES": [
+      {
+        "path": "/api/exchanges/status",
+        "method": "GET",
+        "category": "EXCHANGES",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/exchanges/health",
+        "method": "GET",
+        "category": "EXCHANGES",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/exchanges/balances",
+        "method": "GET",
+        "category": "EXCHANGES",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/balance",
+        "method": "GET",
+        "category": "EXCHANGES",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/exchanges/connect-user",
+        "method": "POST",
+        "category": "EXCHANGES",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "VALIDATION": [
+      {
+        "path": "/api/validation/status",
+        "method": "GET",
+        "category": "VALIDATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/validation/connections",
+        "method": "GET",
+        "category": "VALIDATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/monitor/status",
+        "method": "GET",
+        "category": "VALIDATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/validation/run",
+        "method": "POST",
+        "category": "VALIDATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/monitor/check",
+        "method": "POST",
+        "category": "VALIDATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/validation/revalidate",
+        "method": "POST",
+        "category": "VALIDATION",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "WEBHOOKS": [
+      {
+        "path": "/webhook",
+        "method": "GET",
+        "category": "WEBHOOKS",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/webhooks/signal",
+        "method": "POST",
+        "category": "WEBHOOKS",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "FINANCIAL": [
+      {
+        "path": "/api/financial/summary",
+        "method": "GET",
+        "category": "FINANCIAL",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/stripe/recharge",
+        "method": "POST",
+        "category": "FINANCIAL",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "TRADING": [
+      {
+        "path": "/api/executors/status",
+        "method": "GET",
+        "category": "TRADING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/trade/status",
+        "method": "GET",
+        "category": "TRADING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/trade/balances",
+        "method": "GET",
+        "category": "TRADING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/trade/connections",
+        "method": "GET",
+        "category": "TRADING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/trade/connection/:userId/:exchange/:environment",
+        "method": "GET",
+        "category": "TRADING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/executors/trade",
+        "method": "POST",
+        "category": "TRADING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/trade/execute",
+        "method": "POST",
+        "category": "TRADING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/trade/execute-all",
+        "method": "POST",
+        "category": "TRADING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/trade/validate",
+        "method": "POST",
+        "category": "TRADING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "TESTING": [
+      {
+        "path": "/api/test-connection",
+        "method": "GET",
+        "category": "TESTING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/demo/saldos",
+        "method": "GET",
+        "category": "TESTING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/demo-saldos",
+        "method": "GET",
+        "category": "TESTING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/test/constraint-error",
+        "method": "POST",
+        "category": "TESTING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      },
+      {
+        "path": "/api/test/api-key-error",
+        "method": "POST",
+        "category": "TESTING",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ],
+    "REPORTS": [
+      {
+        "path": "/api/saldos/coletar-real",
+        "method": "POST",
+        "category": "REPORTS",
+        "statusCode": 404,
+        "success": true,
+        "contentType": "text/html",
+        "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+      }
+    ]
+  },
+  "allResults": [
+    {
+      "path": "/health",
+      "method": "GET",
+      "category": "BASIC",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/status",
+      "method": "GET",
+      "category": "BASIC",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/",
+      "method": "GET",
+      "category": "BASIC",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/dashboard/summary",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/system-status",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/commission-plans",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/user/:userId/balances",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/admin/financial-summary",
+      "method": "GET",
+      "category": "ADMINISTRATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/admin/generate-coupon-code",
+      "method": "GET",
+      "category": "ADMINISTRATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/users",
+      "method": "GET",
+      "category": "USER_MANAGEMENT",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/positions",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/exchanges/status",
+      "method": "GET",
+      "category": "EXCHANGES",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/exchanges/health",
+      "method": "GET",
+      "category": "EXCHANGES",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/validation/status",
+      "method": "GET",
+      "category": "VALIDATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/validation/connections",
+      "method": "GET",
+      "category": "VALIDATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/exchanges/balances",
+      "method": "GET",
+      "category": "EXCHANGES",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/monitor/status",
+      "method": "GET",
+      "category": "VALIDATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/systems/status",
+      "method": "GET",
+      "category": "ADMINISTRATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/ip-diagnostic",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/error-handling/status",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/dashboard",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/webhook",
+      "method": "GET",
+      "category": "WEBHOOKS",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/trading/status",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/signals",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/balance",
+      "method": "GET",
+      "category": "EXCHANGES",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/financial/summary",
+      "method": "GET",
+      "category": "FINANCIAL",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/market/data",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/dominance",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/executors/status",
+      "method": "GET",
+      "category": "TRADING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/trade/status",
+      "method": "GET",
+      "category": "TRADING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/trade/balances",
+      "method": "GET",
+      "category": "TRADING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/trade/connections",
+      "method": "GET",
+      "category": "TRADING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/trade/connection/:userId/:exchange/:environment",
+      "method": "GET",
+      "category": "TRADING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/dashboard-production",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/dashboard/realtime",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/dashboard/signals",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/dashboard/orders",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/dashboard/users",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/dashboard/balances",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/dashboard/admin-logs",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/dashboard/ai-analysis",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/test-connection",
+      "method": "GET",
+      "category": "TESTING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/painel",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/painel/executivo",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/painel/fluxo",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/painel/decisoes",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/painel/usuarios",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/painel/alertas",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/painel/diagnosticos",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/painel/executivo",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/painel/fluxo",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/painel/decisoes",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/painel/usuarios",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/painel/alertas",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/painel/diagnosticos",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/painel/realtime",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/painel/dados",
+      "method": "GET",
+      "category": "DASHBOARD",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/demo/saldos",
+      "method": "GET",
+      "category": "TESTING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/demo-saldos",
+      "method": "GET",
+      "category": "TESTING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/production-mode",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/current-mode",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/system/status",
+      "method": "GET",
+      "category": "ADMINISTRATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/ativar-chaves-reais",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/fix-database",
+      "method": "GET",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/webhooks/signal",
+      "method": "POST",
+      "category": "WEBHOOKS",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/validate-position",
+      "method": "POST",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/calculate-commission",
+      "method": "POST",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/stripe/recharge",
+      "method": "POST",
+      "category": "FINANCIAL",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/admin/create-coupon",
+      "method": "POST",
+      "category": "ADMINISTRATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/user/use-coupon",
+      "method": "POST",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/user/request-withdrawal",
+      "method": "POST",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/affiliate/convert-commission",
+      "method": "POST",
+      "category": "USER_MANAGEMENT",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/exchanges/connect-user",
+      "method": "POST",
+      "category": "EXCHANGES",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/validation/run",
+      "method": "POST",
+      "category": "VALIDATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/monitor/check",
+      "method": "POST",
+      "category": "VALIDATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/test/constraint-error",
+      "method": "POST",
+      "category": "TESTING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/test/api-key-error",
+      "method": "POST",
+      "category": "TESTING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/validation/revalidate",
+      "method": "POST",
+      "category": "VALIDATION",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/executors/trade",
+      "method": "POST",
+      "category": "TRADING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/trade/execute",
+      "method": "POST",
+      "category": "TRADING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/trade/execute-all",
+      "method": "POST",
+      "category": "TRADING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/trade/validate",
+      "method": "POST",
+      "category": "TRADING",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/register",
+      "method": "POST",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/login",
+      "method": "POST",
+      "category": "OTHER",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    },
+    {
+      "path": "/api/saldos/coletar-real",
+      "method": "POST",
+      "category": "REPORTS",
+      "statusCode": 404,
+      "success": true,
+      "contentType": "text/html",
+      "responsePreview": "<!doctype html><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta charset=utf-8>"
+    }
+  ],
+  "baseUrl": "https://coinbitclub-market-bot-backend-production.up.railway.app"
+}

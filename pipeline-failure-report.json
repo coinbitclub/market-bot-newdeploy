@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-08-07T16:25:33.213Z",
+  "status": "failed",
+  "failedStep": "code-quality-check",
+  "failureReason": "Falhas na qualidade do código",
+  "completedSteps": 0,
+  "failedSteps": 1,
+  "steps": [
+    {
+      "success": false,
+      "message": "Falhas na qualidade do código",
+      "details": [
+        {
+          "name": "ESLint",
+          "passed": true
+        },
+        {
+          "name": "Prettier",
+          "passed": true
+        },
+        {
+          "name": "Complexity Analysis",
+          "passed": true
+        },
+        {
+          "name": "Code Duplication",
+          "passed": false
+        },
+        {
+          "name": "Documentation Coverage",
+          "passed": false
+        }
+      ],
+      "duration": 2009,
+      "step": "code-quality-check"
+    }
+  ]
+}

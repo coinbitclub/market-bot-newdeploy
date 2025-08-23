@@ -1,0 +1,26 @@
+# VARIÁVEIS PARA CONFIGURAR NO RAILWAY
+# ===================================
+
+# APIs Externas (OBRIGATÓRIAS)
+OPENAI_API_KEY=sk-proj-...
+COINSTATS_API_KEY=ZFIxigBcVaCyXDL1Qp...
+
+# Segurança (OBRIGATÓRIAS)
+JWT_SECRET=coinbitclub-production-jwt-secret-ultra-secure-2025
+ENCRYPTION_KEY=coinbitclub-encrypt-key-32-chars-123
+WEBHOOK_SECRET=coinbitclub-webhook-secret-production-2025
+
+# Exchanges (OPCIONAL - usar chaves do banco se não configurar)
+BINANCE_API_KEY=
+BINANCE_API_SECRET=
+BYBIT_API_KEY=
+BYBIT_API_SECRET=
+
+# Stripe (QUANDO IMPLEMENTAR PAGAMENTOS)
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+# NGROK (PARA IP FIXO - OPCIONAL)
+NGROK_AUTH_TOKEN=
+NGROK_REGION=us
+NGROK_SUBDOMAIN=coinbitclub-bot

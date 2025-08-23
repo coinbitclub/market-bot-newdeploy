@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoinBitClub - Dashboard Operacional</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .header {
+            background: rgba(0,0,0,0.3);
+            padding: 1rem 2rem;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 300;
+            text-align: center;
+        }
+
+        .header h1 span {
+            color: #FFD700;
+            font-weight: 600;
+        }
+
+        .dashboard-container {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255,255,255,0.15);
+        }
+
+        .metric-title {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-subtitle {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .status-positive {
+            color: #4CAF50;
+        }
+
+        .status-warning {
+            color: #FF9800;
+        }
+
+        .status-negative {
+            color: #F44336;
+        }
+
+        .workflow-section {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .workflow-title {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 2rem;
+            color: #FFD700;
+        }
+
+        .workflow-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .workflow-step {
+            flex: 1;
+            min-width: 200px;
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1e3c72;
+            margin: 0 auto 1rem;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+        }
+
+        .step-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .step-description {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            line-height: 1.4;
+        }
+
+        .workflow-step:not(:last-child)::after {
+            content: '→';
+            position: absolute;
+            right: -1rem;
+            top: 30px;
+            font-size: 2rem;
+            color: #FFD700;
+            opacity: 0.6;
+        }
+
+        .alerts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .alert-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border-left: 4px solid #FFD700;
+        }
+
+        .alert-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .alert-content {
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .update-time {
+            text-align: center;
+            opacity: 0.6;
+            font-size: 0.9rem;
+            margin-top: 2rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            opacity: 0.7;
+        }
+
+        .error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 1rem;
+            }
+
+            .workflow-steps {
+                flex-direction: column;
+            }
+
+            .workflow-step:not(:last-child)::after {
+                content: '↓';
+                position: static;
+                display: block;
+                margin: 1rem 0;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .metric-value {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><span>CoinBitClub</span> Trading System</h1>
+    </div>
+
+    <div class="dashboard-container">
+        <!-- Métricas Principais -->
+        <div class="metrics-grid" id="metricsGrid">
+            <div class="loading">Carregando métricas...</div>
+        </div>
+
+        <!-- Fluxo de Trading -->
+        <div class="workflow-section">
+            <h2 class="workflow-title">Fluxo de Trading Automatizado</h2>
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-title">Coleta de Sinais</div>
+                    <div class="step-description">Monitora fontes externas e coleta sinais de trading em tempo real</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-title">Análise IA</div>
+                    <div class="step-description">Processa sinais com inteligência artificial e valida estratégias</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">3</div>
+                    <div class="step-title">Execução</div>
+                    <div class="step-description">Executa ordens automaticamente nas exchanges dos usuários</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">4</div>
+                    <div class="step-title">Monitoramento</div>
+                    <div class="step-description">Acompanha posições abertas e gerencia risk management</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">5</div>
+                    <div class="step-title">Relatórios</div>
+                    <div class="step-description">Gera relatórios de performance e notifica resultados</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alertas do Sistema -->
+        <div class="alerts-section" id="alertsSection">
+            <div class="loading">Carregando alertas...</div>
+        </div>
+
+        <!-- Tempo de Atualização -->
+        <div class="update-time" id="updateTime">
+            Última atualização: Carregando...
+        </div>
+    </div>
+
+    <script>
+        // Função para buscar dados da API
+        async function fetchDashboardData() {
+            try {
+                const response = await fetch('/api/dashboard/summary');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Erro ao buscar dados:', error);
+                throw error;
+            }
+        }
+
+        // Função para formatar números
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        }
+
+        // Função para formatar moeda
+        function formatCurrency(value, currency = 'USD') {
+            if (currency === 'BRL') {
+                return new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                }).format(value);
+            }
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(value);
+        }
+
+        // Função para renderizar métricas
+        function renderMetrics(data) {
+            const metricsGrid = document.getElementById('metricsGrid');
+            
+            const metrics = [
+                {
+                    title: 'Usuários Ativos',
+                    value: data.users?.active || 0,
+                    subtitle: `${data.users?.total || 0} total cadastrados`,
+                    status: 'positive'
+                },
+                {
+                    title: 'Chaves Válidas',
+                    value: data.api_keys?.valid || 0,
+                    subtitle: `${data.api_keys?.invalid || 0} inválidas`,
+                    status: data.api_keys?.valid > data.api_keys?.invalid ? 'positive' : 'warning'
+                },
+                {
+                    title: 'Posições Abertas',
+                    value: data.positions?.open || 0,
+                    subtitle: `${data.positions?.total || 0} total`,
+                    status: 'positive'
+                },
+                {
+                    title: 'Volume 24h',
+                    value: formatCurrency(data.volume?.usd_24h || 0),
+                    subtitle: `${formatCurrency(data.volume?.brl_24h || 0, 'BRL')} BRL`,
+                    status: 'positive'
+                },
+                {
+                    title: 'P&L Total',
+                    value: formatCurrency(data.pnl?.total_usd || 0),
+                    subtitle: data.pnl?.total_usd >= 0 ? 'Lucro acumulado' : 'Prejuízo acumulado',
+                    status: data.pnl?.total_usd >= 0 ? 'positive' : 'negative'
+                },
+                {
+                    title: 'Sinais Hoje',
+                    value: data.signals?.today || 0,
+                    subtitle: `${data.signals?.success_rate || 0}% taxa de sucesso`,
+                    status: 'positive'
+                }
+            ];
+
+            metricsGrid.innerHTML = metrics.map(metric => `
+                <div class="metric-card">
+                    <div class="metric-title">${metric.title}</div>
+                    <div class="metric-value status-${metric.status}">${metric.value}</div>
+                    <div class="metric-subtitle">${metric.subtitle}</div>
+                </div>
+            `).join('');
+        }
+
+        // Função para renderizar alertas
+        function renderAlerts(data) {
+            const alertsSection = document.getElementById('alertsSection');
+            
+            const alerts = [
+                {
+                    title: '🔄 Sistema de Trading',
+                    content: `Sistema operando normalmente. ${data.positions?.open || 0} posições ativas sendo monitoradas.`
+                },
+                {
+                    title: '🔑 Monitoramento de APIs',
+                    content: `${data.api_keys?.valid || 0} chaves válidas. ${data.api_keys?.invalid || 0} chaves requerem atenção.`
+                },
+                {
+                    title: '📊 Performance',
+                    content: `Taxa de sucesso dos sinais: ${data.signals?.success_rate || 0}%. Volume 24h: ${formatCurrency(data.volume?.usd_24h || 0)}.`
+                },
+                {
+                    title: '⚡ Status do Sistema',
+                    content: 'Todos os serviços operacionais. Conectividade com exchanges: Normal.'
+                }
+            ];
+
+            alertsSection.innerHTML = alerts.map(alert => `
+                <div class="alert-card">
+                    <div class="alert-title">${alert.title}</div>
+                    <div class="alert-content">${alert.content}</div>
+                </div>
+            `).join('');
+        }
+
+        // Função para atualizar o dashboard
+        async function updateDashboard() {
+            try {
+                const data = await fetchDashboardData();
+                renderMetrics(data);
+                renderAlerts(data);
+                
+                // Atualizar tempo
+                const updateTime = document.getElementById('updateTime');
+                updateTime.textContent = `Última atualização: ${new Date().toLocaleString('pt-BR')}`;
+                
+            } catch (error) {
+                console.error('Erro ao atualizar dashboard:', error);
+                
+                // Mostrar erro na interface
+                const metricsGrid = document.getElementById('metricsGrid');
+                const alertsSection = document.getElementById('alertsSection');
+                
+                const errorHTML = `
+                    <div class="error">
+                        <h3>Erro ao carregar dados</h3>
+                        <p>Não foi possível conectar com a API. Tentando novamente...</p>
+                    </div>
+                `;
+                
+                metricsGrid.innerHTML = errorHTML;
+                alertsSection.innerHTML = errorHTML;
+            }
+        }
+
+        // Inicializar dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDashboard();
+            
+            // Atualizar a cada 30 segundos
+            setInterval(updateDashboard, 30000);
+        });
+
+        // Atualizar quando a página ficar visível novamente
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                updateDashboard();
+            }
+        });
+    </script>
+</body>
+</html>

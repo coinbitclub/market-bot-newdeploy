@@ -1,0 +1,376 @@
+{
+  "timestamp": "2025-08-07T16:02:32.863Z",
+  "overall_conformity": 15,
+  "categories": {
+    "architecture": [
+      {
+        "item": "Orquestração centralizada",
+        "expected": "Todos agentes rodam como processos orquestrados",
+        "current": "Sistema tem processador multi-usuário e gerenciador de usuários",
+        "status": "PARCIAL",
+        "score": 60,
+        "gap": "Falta orquestrador central que monitore todos os microserviços"
+      },
+      {
+        "item": "Microserviços isolados",
+        "expected": "Nenhum serviço sobe isolado",
+        "current": "Serviços ainda podem ser executados independentemente",
+        "status": "FALTA",
+        "score": 20,
+        "gap": "Necessário criar orquestrador que gerencie dependências"
+      },
+      {
+        "item": "Desenvolvimento minimalista",
+        "expected": "Só o essencial, mas todos fluxos automatizados",
+        "current": "Sistema funcional básico implementado",
+        "status": "PARCIAL",
+        "score": 70,
+        "gap": "Faltam automações de monitoramento e limpeza"
+      },
+      {
+        "item": "Stripe como único processador",
+        "expected": "ÚNICO processador financeiro",
+        "current": "Sistema não tem integração Stripe implementada",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar integração completa com Stripe"
+      },
+      {
+        "item": "Twilio apenas para onboarding",
+        "expected": "Somente para validação OTP/SMS",
+        "current": "Sistema não tem integração Twilio",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar Twilio para onboarding"
+      }
+    ],
+    "components": [
+      {
+        "item": "signal_ingestor",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "fg_index_manager",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "order_manager",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "order_executor",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "user_config_manager",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "api_key_manager",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "financial_manager",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Implementação básica existe",
+        "status": "PARCIAL",
+        "score": 40,
+        "gap": "Converter para microserviço orquestrado"
+      },
+      {
+        "item": "commission_manager",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "affiliate_manager",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "bonus_manager",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "metrics_collector",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "audit_manager",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "cleanup_manager",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      },
+      {
+        "item": "ai_supervisor",
+        "expected": "Microserviço independente e orquestrado",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar do zero"
+      }
+    ],
+    "operational_flow": [
+      {
+        "item": "Validação Fear & Greed Index",
+        "expected": "Consulta F&G, fallback automático, direção por índice",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar fg_index_manager"
+      },
+      {
+        "item": "Recebimento de sinais webhook",
+        "expected": "POST /webhook, validação duplicidade, 2min válido",
+        "current": "Webhook básico implementado",
+        "status": "PARCIAL",
+        "score": 60,
+        "gap": "Adicionar validação F&G e duplicidade"
+      },
+      {
+        "item": "Validações obrigatórias",
+        "expected": "Max 2 posições, bloqueio ticker, saldo mínimo",
+        "current": "Validações básicas de chaves implementadas",
+        "status": "PARCIAL",
+        "score": 40,
+        "gap": "Implementar todas as regras de negócio"
+      },
+      {
+        "item": "Execução com TP/SL",
+        "expected": "TP/SL obrigatórios, registro completo",
+        "current": "Execução básica sem TP/SL automático",
+        "status": "PARCIAL",
+        "score": 30,
+        "gap": "Implementar TP/SL obrigatórios"
+      },
+      {
+        "item": "Monitoramento até fechamento",
+        "expected": "Monitor contínuo, fecha por TP/SL/sinal",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar monitor_manager"
+      },
+      {
+        "item": "Cálculo de comissões",
+        "expected": "Auto cálculo, débito, registro Stripe",
+        "current": "Estrutura de DB existe, lógica não implementada",
+        "status": "FALTA",
+        "score": 10,
+        "gap": "Implementar commission_manager"
+      }
+    ],
+    "security": [
+      {
+        "item": "Chaves API criptografadas",
+        "expected": "Criptografia simétrica, nunca texto puro",
+        "current": "Implementado com AES-256-CBC",
+        "status": "OK",
+        "score": 100,
+        "gap": "Nenhum"
+      },
+      {
+        "item": "Validação de permissões",
+        "expected": "Valida permissões mínimas, bloqueia se saque habilitado",
+        "current": "Validação básica implementada",
+        "status": "PARCIAL",
+        "score": 70,
+        "gap": "Adicionar verificação de permissão de saque"
+      },
+      {
+        "item": "IP fixo whitelist",
+        "expected": "IP fixo obrigatório cadastrado nas chaves",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar verificação de IP whitelist"
+      },
+      {
+        "item": "JWT e RBAC",
+        "expected": "Autenticação JWT, controle de acesso por papel",
+        "current": "Sistema básico de usuários",
+        "status": "FALTA",
+        "score": 20,
+        "gap": "Implementar JWT e RBAC completo"
+      },
+      {
+        "item": "Auditoria completa",
+        "expected": "Log de todas ações, exportável",
+        "current": "Logs básicos de execução",
+        "status": "PARCIAL",
+        "score": 30,
+        "gap": "Implementar audit_manager completo"
+      }
+    ],
+    "financial_system": [
+      {
+        "item": "Integração Stripe",
+        "expected": "Assinaturas, recargas, webhooks, conciliação",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar financial_manager com Stripe"
+      },
+      {
+        "item": "Sistema de planos",
+        "expected": "PRO/FLEX Brasil/Global, FREE testnet",
+        "current": "Estrutura DB existe, lógica não implementada",
+        "status": "FALTA",
+        "score": 10,
+        "gap": "Implementar lógica de planos e validações"
+      },
+      {
+        "item": "Comissionamento automático",
+        "expected": "10%/20% + afiliado 1.5%/5%",
+        "current": "Estrutura DB existe",
+        "status": "FALTA",
+        "score": 10,
+        "gap": "Implementar commission_manager"
+      },
+      {
+        "item": "Sistema de bônus",
+        "expected": "Bônus automático em recargas ≥R$500",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar bonus_manager"
+      },
+      {
+        "item": "Saldos e limites",
+        "expected": "Saldo pré-pago, mínimos por plano, validações",
+        "current": "Colunas de saldo existem, validações faltam",
+        "status": "PARCIAL",
+        "score": 20,
+        "gap": "Implementar validações de saldo e limites"
+      }
+    ],
+    "monitoring": [
+      {
+        "item": "Dashboards em tempo real",
+        "expected": "Usuário, Afiliado, Admin com KPIs",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar dashboards e frontend"
+      },
+      {
+        "item": "Métricas e KPIs",
+        "expected": "Winrate, retorno, saldo, comissões",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar metrics_collector"
+      },
+      {
+        "item": "Alertas automáticos",
+        "expected": "Prometheus/Grafana, alertas admin",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar sistema de monitoramento"
+      },
+      {
+        "item": "Logs estruturados",
+        "expected": "ELK/Loki, correlationId, exportáveis",
+        "current": "Logs básicos no console",
+        "status": "FALTA",
+        "score": 10,
+        "gap": "Implementar logging estruturado"
+      },
+      {
+        "item": "Healthcheck de agentes",
+        "expected": "Status de todos microserviços",
+        "current": "Não implementado",
+        "status": "FALTA",
+        "score": 0,
+        "gap": "Implementar healthcheck no orquestrador"
+      }
+    ]
+  },
+  "critical_gaps": [
+    "Stripe como único processador",
+    "Twilio apenas para onboarding",
+    "signal_ingestor",
+    "fg_index_manager",
+    "order_manager",
+    "order_executor",
+    "user_config_manager",
+    "api_key_manager",
+    "commission_manager",
+    "affiliate_manager",
+    "bonus_manager",
+    "metrics_collector",
+    "audit_manager",
+    "cleanup_manager",
+    "ai_supervisor",
+    "Validação Fear & Greed Index",
+    "Monitoramento até fechamento",
+    "IP fixo whitelist",
+    "Integração Stripe",
+    "Sistema de bônus",
+    "Dashboards em tempo real",
+    "Métricas e KPIs",
+    "Alertas automáticos",
+    "Healthcheck de agentes"
+  ],
+  "recommendations": [
+    "Implementar orquestrador central como prioridade máxima",
+    "Desenvolver integração Stripe para sistema financeiro",
+    "Criar sistema de monitoramento e métricas",
+    "Implementar todos os microserviços faltantes",
+    "Adicionar validações completas de regras de negócio",
+    "Desenvolver dashboards para usuários e admin",
+    "Implementar sistema de auditoria completo",
+    "Adicionar TP/SL obrigatórios nas operações",
+    "Criar sistema de afiliados e comissões",
+    "Implementar cleanup e manutenção automática"
+  ]
+}

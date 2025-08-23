@@ -1,0 +1,13 @@
+{
+  "timestamp": "2025-08-12T01:45:29.206Z",
+  "routesFound": 10,
+  "totalRoutes": 10,
+  "middlewareFound": 2,
+  "totalMiddleware": 2,
+  "routePercentage": 100,
+  "middlewarePercentage": 100,
+  "allCriticalRoutesPresent": true,
+  "allMiddlewarePresent": true,
+  "additionalChecksOk": true,
+  "readyForDeploy": true
+}
