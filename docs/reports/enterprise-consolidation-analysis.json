@@ -1,0 +1,579 @@
+{
+  "timestamp": "2025-09-03T13:19:19.813Z",
+  "analysis": {
+    "apis": {
+      "files": [
+        {
+          "file": "routes/affiliate-api.js",
+          "endpoints": [
+            {
+              "method": "POST",
+              "path": "/api/affiliate/request"
+            },
+            {
+              "method": "GET",
+              "path": "/api/admin/affiliate/requests"
+            },
+            {
+              "method": "PUT",
+              "path": "/api/admin/affiliate/request/:id/approve"
+            },
+            {
+              "method": "PUT",
+              "path": "/api/admin/affiliate/request/:id/reject"
+            },
+            {
+              "method": "POST",
+              "path": "/api/affiliate/convert-commissions"
+            },
+            {
+              "method": "GET",
+              "path": "/api/affiliate/:userId/conversions"
+            },
+            {
+              "method": "GET",
+              "path": "/api/affiliate/:userId/dashboard"
+            },
+            {
+              "method": "PUT",
+              "path": "/api/affiliate/:userId/preferences"
+            },
+            {
+              "method": "GET",
+              "path": "/api/admin/affiliate/performance"
+            },
+            {
+              "method": "POST",
+              "path": "/request"
+            },
+            {
+              "method": "POST",
+              "path": "/promote-vip"
+            },
+            {
+              "method": "GET",
+              "path": "/:userId/dashboard"
+            },
+            {
+              "method": "POST",
+              "path": "/convert-commissions"
+            }
+          ],
+          "size": 28713,
+          "duplicatedLogic": [
+            "affiliate_code",
+            "commission",
+            "Pool"
+          ]
+        },
+        {
+          "file": "routes/api.js",
+          "endpoints": [
+            {
+              "method": "POST",
+              "path": "/api/affiliate/request"
+            },
+            {
+              "method": "GET",
+              "path": "/api/admin/affiliate/requests"
+            },
+            {
+              "method": "PUT",
+              "path": "/api/admin/affiliate/request/:id/approve"
+            },
+            {
+              "method": "PUT",
+              "path": "/api/admin/affiliate/request/:id/reject"
+            },
+            {
+              "method": "POST",
+              "path": "/api/affiliate/convert-commissions"
+            },
+            {
+              "method": "GET",
+              "path": "/api/affiliate/:userId/conversions"
+            },
+            {
+              "method": "GET",
+              "path": "/api/affiliate/:userId/dashboard"
+            },
+            {
+              "method": "PUT",
+              "path": "/api/affiliate/:userId/preferences"
+            },
+            {
+              "method": "GET",
+              "path": "/api/admin/affiliate/performance"
+            }
+          ],
+          "size": 26448,
+          "duplicatedLogic": [
+            "affiliate_code",
+            "commission",
+            "Pool"
+          ]
+        },
+        {
+          "file": "routes/terms-api.js",
+          "endpoints": [
+            {
+              "method": "GET",
+              "path": "/current"
+            },
+            {
+              "method": "POST",
+              "path": "/accept"
+            },
+            {
+              "method": "GET",
+              "path": "/user/:userId/status"
+            },
+            {
+              "method": "GET",
+              "path": "/dashboard"
+            },
+            {
+              "method": "POST",
+              "path": "/admin/create-version"
+            },
+            {
+              "method": "PUT",
+              "path": "/admin/activate/:versionId"
+            },
+            {
+              "method": "GET",
+              "path": "/admin/versions"
+            },
+            {
+              "method": "GET",
+              "path": "/admin/compliance-report"
+            },
+            {
+              "method": "GET",
+              "path": "/health"
+            }
+          ],
+          "size": 21059,
+          "duplicatedLogic": []
+        }
+      ],
+      "duplicatedEndpoints": [
+        {
+          "endpoint": "POST /api/affiliate/request",
+          "files": [
+            "routes/affiliate-api.js",
+            "routes/api.js"
+          ]
+        },
+        {
+          "endpoint": "GET /api/admin/affiliate/requests",
+          "files": [
+            "routes/affiliate-api.js",
+            "routes/api.js"
+          ]
+        },
+        {
+          "endpoint": "PUT /api/admin/affiliate/request/:id/approve",
+          "files": [
+            "routes/affiliate-api.js",
+            "routes/api.js"
+          ]
+        },
+        {
+          "endpoint": "PUT /api/admin/affiliate/request/:id/reject",
+          "files": [
+            "routes/affiliate-api.js",
+            "routes/api.js"
+          ]
+        },
+        {
+          "endpoint": "POST /api/affiliate/convert-commissions",
+          "files": [
+            "routes/affiliate-api.js",
+            "routes/api.js"
+          ]
+        },
+        {
+          "endpoint": "GET /api/affiliate/:userId/conversions",
+          "files": [
+            "routes/affiliate-api.js",
+            "routes/api.js"
+          ]
+        },
+        {
+          "endpoint": "GET /api/affiliate/:userId/dashboard",
+          "files": [
+            "routes/affiliate-api.js",
+            "routes/api.js"
+          ]
+        },
+        {
+          "endpoint": "PUT /api/affiliate/:userId/preferences",
+          "files": [
+            "routes/affiliate-api.js",
+            "routes/api.js"
+          ]
+        },
+        {
+          "endpoint": "GET /api/admin/affiliate/performance",
+          "files": [
+            "routes/affiliate-api.js",
+            "routes/api.js"
+          ]
+        }
+      ],
+      "consolidationOpportunity": true
+    },
+    "services": {
+      "files": [
+        {
+          "file": "src/services/financial-manager/stripe-integration-manager.js",
+          "classes": [
+            "StripeIntegrationManager"
+          ],
+          "methods": [
+            "processSubscription",
+            "processRecharge",
+            "processWebhook",
+            "handlePaymentSuccess",
+            "handleSubscriptionPayment",
+            "handleSubscriptionCreated",
+            "handleSubscriptionUpdated",
+            "handleSubscriptionCancelled",
+            "handlePaymentFailed",
+            "createCheckoutSession",
+            "getPaymentInfo",
+            "getSubscriptionInfo",
+            "cancelSubscription",
+            "constructor",
+            "catch",
+            "calculateRechargeBonus"
+          ],
+          "size": 15291,
+          "type": "stripe"
+        },
+        {
+          "file": "services/financial-manager/stripe-integration-manager.js",
+          "classes": [
+            "StripeIntegrationManager"
+          ],
+          "methods": [
+            "processSubscription",
+            "processRecharge",
+            "processWebhook",
+            "handlePaymentSuccess",
+            "handleSubscriptionPayment",
+            "handleSubscriptionCreated",
+            "handleSubscriptionUpdated",
+            "handleSubscriptionCancelled",
+            "handlePaymentFailed",
+            "createCheckoutSession",
+            "getPaymentInfo",
+            "getSubscriptionInfo",
+            "cancelSubscription",
+            "constructor",
+            "catch",
+            "calculateRechargeBonus"
+          ],
+          "size": 15291,
+          "type": "stripe"
+        },
+        {
+          "file": "src/modules/payments/stripe-links-real-system.js",
+          "classes": [
+            "StripeLinksRealSystem"
+          ],
+          "methods": [
+            "createDatabaseTables",
+            "createStripeProducts",
+            "createStripePrices",
+            "createPaymentLinks",
+            "createAffiliateUser",
+            "createAffiliateLinks",
+            "getAffiliateLinks",
+            "createAdminCredit",
+            "applyAdminCredit",
+            "getUserBalance",
+            "initializeSystem",
+            "testDatabaseConnection",
+            "displaySystemInfo",
+            "constructor",
+            "catch",
+            "generateAffiliateCode",
+            "generateAdminCouponCode"
+          ],
+          "size": 24449,
+          "type": "stripe"
+        },
+        {
+          "file": "src/modules/payments/stripe-system-simplified.js",
+          "classes": [
+            "StripeSystemSimplified"
+          ],
+          "methods": [
+            "createStripeProducts",
+            "createStripePrices",
+            "createPaymentLinks",
+            "createAffiliateSystem",
+            "createAdminCreditSystem",
+            "displayFinalResults",
+            "run",
+            "constructor",
+            "catch",
+            "generateAdminCouponCode"
+          ],
+          "size": 9818,
+          "type": "stripe"
+        }
+      ],
+      "stripeImplementations": 4,
+      "consolidationOpportunity": true
+    },
+    "components": {
+      "files": [
+        {
+          "file": "frontend\\src\\components\\affiliate\\AffiliateRequestForm-atualizado.jsx",
+          "name": "AffiliateRequestForm-atualizado",
+          "size": 18126,
+          "hooks": [
+            "useState",
+            "userId"
+          ],
+          "props": []
+        },
+        {
+          "file": "frontend\\src\\components\\affiliate\\AffiliateRequestForm.jsx",
+          "name": "AffiliateRequestForm",
+          "size": 14450,
+          "hooks": [
+            "useState",
+            "userId"
+          ],
+          "props": []
+        },
+        {
+          "file": "frontend\\src\\components\\affiliate\\AffiliateRequestManagement.jsx",
+          "name": "AffiliateRequestManagement",
+          "size": 23240,
+          "hooks": [
+            "useState",
+            "useEffect",
+            "user",
+            "username"
+          ],
+          "props": []
+        },
+        {
+          "file": "frontend\\src\\components\\affiliate\\AffiliateVIPManager.jsx",
+          "name": "AffiliateVIPManager",
+          "size": 21622,
+          "hooks": [
+            "useState",
+            "useEffect",
+            "username"
+          ],
+          "props": []
+        },
+        {
+          "file": "frontend\\src\\components\\affiliate\\CommissionConverter.jsx",
+          "name": "CommissionConverter",
+          "size": 23184,
+          "hooks": [
+            "useState",
+            "useEffect",
+            "userId",
+            "userPrefs"
+          ],
+          "props": []
+        },
+        {
+          "file": "src\\modules\\user\\affiliates\\frontend-components\\AffiliateRequestForm-atualizado.jsx",
+          "name": "AffiliateRequestForm-atualizado",
+          "size": 18126,
+          "hooks": [
+            "useState",
+            "userId"
+          ],
+          "props": []
+        },
+        {
+          "file": "src\\modules\\user\\affiliates\\frontend-components\\AffiliateRequestForm.jsx",
+          "name": "AffiliateRequestForm",
+          "size": 14450,
+          "hooks": [
+            "useState",
+            "userId"
+          ],
+          "props": []
+        },
+        {
+          "file": "src\\modules\\user\\affiliates\\frontend-components\\AffiliateRequestManagement.jsx",
+          "name": "AffiliateRequestManagement",
+          "size": 23240,
+          "hooks": [
+            "useState",
+            "useEffect",
+            "user",
+            "username"
+          ],
+          "props": []
+        },
+        {
+          "file": "src\\modules\\user\\affiliates\\frontend-components\\AffiliateVIPManager.jsx",
+          "name": "AffiliateVIPManager",
+          "size": 21622,
+          "hooks": [
+            "useState",
+            "useEffect",
+            "username"
+          ],
+          "props": []
+        },
+        {
+          "file": "src\\modules\\user\\affiliates\\frontend-components\\CommissionConverter.jsx",
+          "name": "CommissionConverter",
+          "size": 23184,
+          "hooks": [
+            "useState",
+            "useEffect",
+            "userId",
+            "userPrefs"
+          ],
+          "props": []
+        }
+      ],
+      "duplicatedComponents": [
+        {
+          "name": "AffiliateRequestForm-atualizado",
+          "files": [
+            "frontend\\src\\components\\affiliate\\AffiliateRequestForm-atualizado.jsx",
+            "src\\modules\\user\\affiliates\\frontend-components\\AffiliateRequestForm-atualizado.jsx"
+          ]
+        },
+        {
+          "name": "AffiliateRequestForm",
+          "files": [
+            "frontend\\src\\components\\affiliate\\AffiliateRequestForm.jsx",
+            "src\\modules\\user\\affiliates\\frontend-components\\AffiliateRequestForm.jsx"
+          ]
+        },
+        {
+          "name": "AffiliateRequestManagement",
+          "files": [
+            "frontend\\src\\components\\affiliate\\AffiliateRequestManagement.jsx",
+            "src\\modules\\user\\affiliates\\frontend-components\\AffiliateRequestManagement.jsx"
+          ]
+        },
+        {
+          "name": "AffiliateVIPManager",
+          "files": [
+            "frontend\\src\\components\\affiliate\\AffiliateVIPManager.jsx",
+            "src\\modules\\user\\affiliates\\frontend-components\\AffiliateVIPManager.jsx"
+          ]
+        },
+        {
+          "name": "CommissionConverter",
+          "files": [
+            "frontend\\src\\components\\affiliate\\CommissionConverter.jsx",
+            "src\\modules\\user\\affiliates\\frontend-components\\CommissionConverter.jsx"
+          ]
+        }
+      ],
+      "consolidationOpportunity": true
+    },
+    "configs": {
+      "envFiles": 3,
+      "configFiles": 5,
+      "consolidationOpportunity": true
+    }
+  },
+  "consolidationPlan": {
+    "phases": [
+      {
+        "name": "FASE 1: Consolidação de APIs",
+        "priority": "HIGH",
+        "estimatedHours": 8,
+        "description": "Unificar routes/affiliate-api.js e routes/api.js",
+        "benefits": [
+          "Reduzir duplicação",
+          "Melhorar manutenibilidade"
+        ],
+        "files": [
+          "routes/affiliate-api.js",
+          "routes/api.js"
+        ],
+        "action": "consolidate_apis"
+      },
+      {
+        "name": "FASE 2: Consolidação Stripe",
+        "priority": "HIGH",
+        "estimatedHours": 12,
+        "description": "Unificar 4 implementações Stripe em 1 serviço",
+        "benefits": [
+          "Reduzir complexidade",
+          "Melhorar performance"
+        ],
+        "files": [
+          "src/services/financial-manager/stripe-integration-manager.js",
+          "services/financial-manager/stripe-integration-manager.js",
+          "src/modules/payments/stripe-links-real-system.js",
+          "src/modules/payments/stripe-system-simplified.js"
+        ],
+        "action": "consolidate_stripe"
+      },
+      {
+        "name": "FASE 3: Consolidação Frontend",
+        "priority": "MEDIUM",
+        "estimatedHours": 4,
+        "description": "Unificar componentes React duplicados",
+        "benefits": [
+          "Bundle size menor",
+          "Manutenção simplificada"
+        ],
+        "files": [
+          "frontend/components/",
+          "src/modules/*/frontend-components/"
+        ],
+        "action": "consolidate_components"
+      },
+      {
+        "name": "FASE 4: Orquestrador Unificado",
+        "priority": "MEDIUM",
+        "estimatedHours": 6,
+        "description": "Criar orquestrador enterprise único",
+        "benefits": [
+          "Gestão centralizada",
+          "Deployment simplificado"
+        ],
+        "files": [
+          "src/services/orchestration/"
+        ],
+        "action": "create_unified_orchestrator"
+      }
+    ],
+    "totalEstimatedHours": 30,
+    "estimatedDays": 4,
+    "benefits": [
+      "Redução de 60% na duplicação de código",
+      "Melhoria de 40% na manutenibilidade",
+      "Redução de 30% no tamanho do bundle",
+      "Simplificação da arquitetura enterprise"
+    ],
+    "risks": [
+      "Quebra temporária durante migração",
+      "Necessidade de testes extensivos",
+      "Possível incompatibilidade entre versões"
+    ]
+  },
+  "summary": {
+    "totalDuplications": 18,
+    "consolidationOpportunities": 4,
+    "estimatedBenefits": [
+      "Redução de 60% na duplicação de código",
+      "Melhoria de 40% na manutenibilidade",
+      "Redução de 30% no tamanho do bundle",
+      "Simplificação da arquitetura enterprise"
+    ],
+    "recommendedAction": "CONSOLIDAÇÃO URGENTE RECOMENDADA"
+  }
+}

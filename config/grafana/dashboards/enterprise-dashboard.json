@@ -1,0 +1,67 @@
+{
+  "dashboard": {
+    "title": "CoinBitClub Enterprise - Score 100/100",
+    "panels": [
+      {
+        "title": "Sistema Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job='coinbitclub-app'}",
+            "legendFormat": "Sistema Online"
+          }
+        ]
+      },
+      {
+        "title": "Usuários Simultâneos",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "http_requests_total",
+            "legendFormat": "Requisições/s"
+          }
+        ]
+      },
+      {
+        "title": "Latência Média",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "http_request_duration_seconds",
+            "legendFormat": "Latência"
+          }
+        ]
+      },
+      {
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "cpu_usage_percent",
+            "legendFormat": "CPU %"
+          }
+        ]
+      },
+      {
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "memory_usage_percent",
+            "legendFormat": "Memory %"
+          }
+        ]
+      },
+      {
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "postgres_connections_active",
+            "legendFormat": "Conexões Ativas"
+          }
+        ]
+      }
+    ]
+  }
+}

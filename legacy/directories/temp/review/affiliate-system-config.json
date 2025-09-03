@@ -1,0 +1,23 @@
+{
+  "affiliate_system": {
+    "enabled": true,
+    "version": "1.0.0",
+    "features": {
+      "user_requests": true,
+      "admin_approval": true,
+      "commission_conversion": true,
+      "auto_conversion": true,
+      "statistics": true
+    },
+    "commission_rates": {
+      "normal": 0.015,
+      "vip": 0.05
+    },
+    "conversion_bonus": 0.1,
+    "auto_approval": false,
+    "notification_settings": {
+      "email_notifications": true,
+      "system_notifications": true
+    }
+  }
+}

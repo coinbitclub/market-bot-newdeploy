@@ -1,0 +1,53 @@
+{
+  "name": "coinbitclub-market-bot",
+  "version": "2.0.0",
+  "description": "Sistema automatizado de trading CoinbitClub com validação automática de contas",
+  "main": "coinbitclub-launcher.js",
+  "scripts": {
+    "start": "node coinbitclub-launcher.js",
+    "dev": "nodemon coinbitclub-launcher.js",
+    "validate": "node sistema-validacao-automatica.js",
+    "test-connections": "node teste-trade-real.js",
+    "check-balances": "node buscar-saldos-completo.js",
+    "quick-diagnostic": "node diagnostico-rapido.js",
+    "setup-database": "node setup-database.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop coinbitclub-bot",
+    "pm2:restart": "pm2 restart coinbitclub-bot",
+    "pm2:logs": "pm2 logs coinbitclub-bot",
+    "health": "curl http://localhost:3000/health",
+    "revalidate": "curl -X POST http://localhost:3000/revalidate",
+    "connections": "curl http://localhost:3000/connections"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "ccxt": "^4.1.0",
+    "axios": "^1.6.0",
+    "crypto": "^1.0.1",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "pm2": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "CoinbitClub Team",
+  "license": "MIT",
+  "keywords": [
+    "trading",
+    "cryptocurrency",
+    "bot",
+    "bybit",
+    "binance",
+    "automatic",
+    "validation",
+    "coinbitclub"
+  ]
+}

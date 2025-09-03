@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-09-03T13:09:24.221Z",
+  "serverStart": false,
+  "endpoints": [
+    {
+      "path": "/",
+      "name": "Homepage",
+      "status": "SKIPPED",
+      "message": "Servidor não disponível"
+    },
+    {
+      "path": "/health",
+      "name": "Health Check",
+      "status": "SKIPPED",
+      "message": "Servidor não disponível"
+    },
+    {
+      "path": "/api",
+      "name": "API Root",
+      "status": "SKIPPED",
+      "message": "Servidor não disponível"
+    },
+    {
+      "path": "/admin",
+      "name": "Admin",
+      "status": "SKIPPED",
+      "message": "Servidor não disponível"
+    }
+  ],
+  "performance": {},
+  "status": "FAILED",
+  "summary": {
+    "serverStarted": false,
+    "totalEndpoints": 4,
+    "successfulEndpoints": 0,
+    "successRate": 0,
+    "finalStatus": "FAILED"
+  }
+}

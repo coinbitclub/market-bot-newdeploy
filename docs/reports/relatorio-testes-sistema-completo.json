@@ -1,0 +1,658 @@
+{
+  "timestamp": "2025-08-23T01:11:25.825Z",
+  "resultados": {
+    "fear_greed": {
+      "total": 7,
+      "passou": 7,
+      "falhou": 0,
+      "detalhes": [
+        {
+          "cenario": {
+            "valor": 15,
+            "esperado": "SOMENTE_LONG",
+            "tipo": "extremo_fear"
+          },
+          "resultado": {
+            "direcao_final": "SOMENTE_LONG",
+            "fonte_decisao": "FEAR_GREED_PURO",
+            "executa_operacoes": true,
+            "confianca": 0.8,
+            "justificativa": "Fear & Greed 15 < 30 - Extremo Fear favorece LONG"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "valor": 25,
+            "esperado": "SOMENTE_LONG",
+            "tipo": "fear_claro"
+          },
+          "resultado": {
+            "direcao_final": "SOMENTE_LONG",
+            "fonte_decisao": "FEAR_GREED_PURO",
+            "executa_operacoes": true,
+            "confianca": 0.8,
+            "justificativa": "Fear & Greed 25 < 30 - Extremo Fear favorece LONG"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "valor": 35,
+            "esperado": "MARKET_PULSE",
+            "tipo": "neutro_baixo"
+          },
+          "resultado": {
+            "direcao_final": "AGUARDAR",
+            "fonte_decisao": "FEAR_GREED_NEUTRO",
+            "executa_operacoes": false,
+            "confianca": 0.3,
+            "justificativa": "Fear & Greed 35 em zona neutra - sem direção clara"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "valor": 50,
+            "esperado": "MARKET_PULSE",
+            "tipo": "neutro_perfeito"
+          },
+          "resultado": {
+            "direcao_final": "AGUARDAR",
+            "fonte_decisao": "FEAR_GREED_NEUTRO",
+            "executa_operacoes": false,
+            "confianca": 0.3,
+            "justificativa": "Fear & Greed 50 em zona neutra - sem direção clara"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "valor": 65,
+            "esperado": "MARKET_PULSE",
+            "tipo": "neutro_alto"
+          },
+          "resultado": {
+            "direcao_final": "AGUARDAR",
+            "fonte_decisao": "FEAR_GREED_NEUTRO",
+            "executa_operacoes": false,
+            "confianca": 0.3,
+            "justificativa": "Fear & Greed 65 em zona neutra - sem direção clara"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "valor": 85,
+            "esperado": "SOMENTE_SHORT",
+            "tipo": "greed_claro"
+          },
+          "resultado": {
+            "direcao_final": "SOMENTE_SHORT",
+            "fonte_decisao": "FEAR_GREED_PURO",
+            "executa_operacoes": true,
+            "confianca": 0.8,
+            "justificativa": "Fear & Greed 85 > 80 - Extremo Greed favorece SHORT"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "valor": 95,
+            "esperado": "SOMENTE_SHORT",
+            "tipo": "extremo_greed"
+          },
+          "resultado": {
+            "direcao_final": "SOMENTE_SHORT",
+            "fonte_decisao": "FEAR_GREED_PURO",
+            "executa_operacoes": true,
+            "confianca": 0.8,
+            "justificativa": "Fear & Greed 95 > 80 - Extremo Greed favorece SHORT"
+          },
+          "passou": true
+        }
+      ]
+    },
+    "market_pulse": {
+      "total": 6,
+      "passou": 6,
+      "falhou": 0,
+      "detalhes": [
+        {
+          "cenario": {
+            "pm_plus": 75,
+            "pm_minus": 25,
+            "vwd": 1.5,
+            "esperado": "SOMENTE_LONG",
+            "tipo": "bullish_forte"
+          },
+          "resultado": {
+            "direcao_sugerida": "SOMENTE_LONG",
+            "confianca": 0.75,
+            "justificativa": "Market Pulse BULLISH: 75.0% positivas + VWΔ 1.50%",
+            "executa_operacoes": true,
+            "metricas_utilizadas": {
+              "PM_PLUS": 75,
+              "PM_MINUS": 25,
+              "VWD": 1.5
+            },
+            "timestamp": "2025-08-23T01:11:25.690Z"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "pm_plus": 25,
+            "pm_minus": 75,
+            "vwd": -1.5,
+            "esperado": "SOMENTE_SHORT",
+            "tipo": "bearish_forte"
+          },
+          "resultado": {
+            "direcao_sugerida": "SOMENTE_SHORT",
+            "confianca": 0.75,
+            "justificativa": "Market Pulse BEARISH: 75.0% negativas + VWΔ -1.50%",
+            "executa_operacoes": true,
+            "metricas_utilizadas": {
+              "PM_PLUS": 25,
+              "PM_MINUS": 75,
+              "VWD": -1.5
+            },
+            "timestamp": "2025-08-23T01:11:25.692Z"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "pm_plus": 60,
+            "pm_minus": 40,
+            "vwd": 0.3,
+            "esperado": "SOMENTE_LONG",
+            "tipo": "bullish_fraco"
+          },
+          "resultado": {
+            "direcao_sugerida": "SOMENTE_LONG",
+            "confianca": 0.55,
+            "justificativa": "Market Pulse BULLISH fraco: 60.0% positivas",
+            "executa_operacoes": true,
+            "metricas_utilizadas": {
+              "PM_PLUS": 60,
+              "PM_MINUS": 40,
+              "VWD": 0.3
+            },
+            "timestamp": "2025-08-23T01:11:25.692Z"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "pm_plus": 40,
+            "pm_minus": 60,
+            "vwd": -0.3,
+            "esperado": "SOMENTE_SHORT",
+            "tipo": "bearish_fraco"
+          },
+          "resultado": {
+            "direcao_sugerida": "SOMENTE_SHORT",
+            "confianca": 0.55,
+            "justificativa": "Market Pulse BEARISH fraco: 60.0% negativas",
+            "executa_operacoes": true,
+            "metricas_utilizadas": {
+              "PM_PLUS": 40,
+              "PM_MINUS": 60,
+              "VWD": -0.3
+            },
+            "timestamp": "2025-08-23T01:11:25.693Z"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "pm_plus": 50,
+            "pm_minus": 50,
+            "vwd": 0.1,
+            "esperado": "AGUARDAR",
+            "tipo": "neutro_equilibrado"
+          },
+          "resultado": {
+            "direcao_sugerida": "AGUARDAR",
+            "confianca": 0.3,
+            "justificativa": "Market Pulse neutro: 50.0% positivas, VWΔ 0.10% - aguardando",
+            "executa_operacoes": false,
+            "metricas_utilizadas": {
+              "PM_PLUS": 50,
+              "PM_MINUS": 50,
+              "VWD": 0.1
+            },
+            "timestamp": "2025-08-23T01:11:25.694Z"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "pm_plus": 52,
+            "pm_minus": 48,
+            "vwd": 0.05,
+            "esperado": "AGUARDAR",
+            "tipo": "neutro_indefinido"
+          },
+          "resultado": {
+            "direcao_sugerida": "AGUARDAR",
+            "confianca": 0.3,
+            "justificativa": "Market Pulse neutro: 52.0% positivas, VWΔ 0.05% - aguardando",
+            "executa_operacoes": false,
+            "metricas_utilizadas": {
+              "PM_PLUS": 52,
+              "PM_MINUS": 48,
+              "VWD": 0.05
+            },
+            "timestamp": "2025-08-23T01:11:25.695Z"
+          },
+          "passou": true
+        }
+      ]
+    },
+    "ia_especializada": {
+      "total": 4,
+      "passou": 4,
+      "falhou": 0,
+      "detalhes": [
+        {
+          "cenario": {
+            "pm_plus": 55,
+            "vwd": 0.4,
+            "fg": 45,
+            "esperado_conservador": true
+          },
+          "resultado": {
+            "direcao_ia": "AGUARDAR",
+            "confianca": 0.4,
+            "justificativa": "Condições indefinidas",
+            "autoriza_execucao": false
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "pm_plus": 65,
+            "vwd": 0.8,
+            "fg": 50,
+            "esperado_long": true
+          },
+          "resultado": {
+            "direcao_ia": "SOMENTE_LONG",
+            "confianca": 0.6,
+            "justificativa": "Sinais bullish claros",
+            "autoriza_execucao": true
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "pm_plus": 35,
+            "vwd": -0.8,
+            "fg": 55,
+            "esperado_short": true
+          },
+          "resultado": {
+            "direcao_ia": "SOMENTE_SHORT",
+            "confianca": 0.6,
+            "justificativa": "Sinais bearish claros",
+            "autoriza_execucao": true
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "pm_plus": 50,
+            "vwd": 0.1,
+            "fg": 50,
+            "esperado_aguardar": true
+          },
+          "resultado": {
+            "direcao_ia": "AGUARDAR",
+            "confianca": 0.3,
+            "justificativa": "Mercado muito equilibrado - aguardar movimento mais claro",
+            "autoriza_execucao": false
+          },
+          "passou": true
+        }
+      ]
+    },
+    "sistema_dual": {
+      "total": 5,
+      "passou": 5,
+      "falhou": 0,
+      "detalhes": [
+        {
+          "cenario": {
+            "fearGreed": 25,
+            "pm_plus": 60,
+            "vwd": 0.5,
+            "esperado": "LONG",
+            "tipo": "fear_domina"
+          },
+          "estrategia": {
+            "estrategia": "fear_greed_puro",
+            "justificativa": "F&G muito claro (25) - sem necessidade de Market Pulse",
+            "fear_greed_clareza": {
+              "valor": 25,
+              "muito_claro": true,
+              "zona_neutra": false,
+              "proximidade_threshold": 5
+            },
+            "mercado_volatilidade": {
+              "alta": false,
+              "media": false,
+              "baixa": true,
+              "vwd_absoluto": 0.5,
+              "dispersao_pm": 10
+            }
+          },
+          "resultado": {
+            "direcao_final": "SOMENTE_LONG",
+            "fonte_decisao": "FEAR_GREED_PURO",
+            "executa_operacoes": true,
+            "confianca": 0.8,
+            "justificativa": "Fear & Greed 25 < 30 - Extremo Fear favorece LONG"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "fearGreed": 85,
+            "pm_plus": 40,
+            "vwd": -0.5,
+            "esperado": "SHORT",
+            "tipo": "greed_domina"
+          },
+          "estrategia": {
+            "estrategia": "fear_greed_puro",
+            "justificativa": "F&G muito claro (85) - sem necessidade de Market Pulse",
+            "fear_greed_clareza": {
+              "valor": 85,
+              "muito_claro": true,
+              "zona_neutra": false,
+              "proximidade_threshold": 5
+            },
+            "mercado_volatilidade": {
+              "alta": false,
+              "media": false,
+              "baixa": true,
+              "vwd_absoluto": 0.5,
+              "dispersao_pm": 10
+            }
+          },
+          "resultado": {
+            "direcao_final": "SOMENTE_SHORT",
+            "fonte_decisao": "FEAR_GREED_PURO",
+            "executa_operacoes": true,
+            "confianca": 0.8,
+            "justificativa": "Fear & Greed 85 > 80 - Extremo Greed favorece SHORT"
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "fearGreed": 50,
+            "pm_plus": 70,
+            "vwd": 1,
+            "esperado": "LONG",
+            "tipo": "market_pulse_long"
+          },
+          "estrategia": {
+            "estrategia": "dual_inteligente",
+            "justificativa": "Zona neutra F&G - ativar sistema dual com IA",
+            "fear_greed_clareza": {
+              "valor": 50,
+              "muito_claro": false,
+              "zona_neutra": true,
+              "proximidade_threshold": 20
+            },
+            "mercado_volatilidade": {
+              "alta": false,
+              "media": true,
+              "baixa": false,
+              "vwd_absoluto": 1,
+              "dispersao_pm": 20
+            }
+          },
+          "resultado": {
+            "direcao_final": "SOMENTE_LONG",
+            "fonte_decisao": "DUAL_MARKET_PULSE",
+            "executa_operacoes": true,
+            "confianca": 0.75,
+            "justificativa": "F&G neutro + Market Pulse claro: Market Pulse BULLISH: 70.0% positivas + VWΔ 1.00%",
+            "fear_greed_value": 50
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "fearGreed": 50,
+            "pm_plus": 30,
+            "vwd": -1,
+            "esperado": "SHORT",
+            "tipo": "market_pulse_short"
+          },
+          "estrategia": {
+            "estrategia": "dual_inteligente",
+            "justificativa": "Zona neutra F&G - ativar sistema dual com IA",
+            "fear_greed_clareza": {
+              "valor": 50,
+              "muito_claro": false,
+              "zona_neutra": true,
+              "proximidade_threshold": 20
+            },
+            "mercado_volatilidade": {
+              "alta": false,
+              "media": true,
+              "baixa": false,
+              "vwd_absoluto": 1,
+              "dispersao_pm": 20
+            }
+          },
+          "resultado": {
+            "direcao_final": "SOMENTE_SHORT",
+            "fonte_decisao": "DUAL_MARKET_PULSE",
+            "executa_operacoes": true,
+            "confianca": 0.75,
+            "justificativa": "F&G neutro + Market Pulse claro: Market Pulse BEARISH: 70.0% negativas + VWΔ -1.00%",
+            "fear_greed_value": 50
+          },
+          "passou": true
+        },
+        {
+          "cenario": {
+            "fearGreed": 50,
+            "pm_plus": 50,
+            "vwd": 0.1,
+            "esperado": "AGUARDAR",
+            "tipo": "neutro_total"
+          },
+          "estrategia": {
+            "estrategia": "dual_inteligente",
+            "justificativa": "Zona neutra F&G - ativar sistema dual com IA",
+            "fear_greed_clareza": {
+              "valor": 50,
+              "muito_claro": false,
+              "zona_neutra": true,
+              "proximidade_threshold": 20
+            },
+            "mercado_volatilidade": {
+              "alta": false,
+              "media": false,
+              "baixa": true,
+              "vwd_absoluto": 0.1,
+              "dispersao_pm": 0
+            }
+          },
+          "resultado": {
+            "direcao_final": "AGUARDAR",
+            "fonte_decisao": "IA_AGUARDAR",
+            "executa_operacoes": false,
+            "fear_greed_value": 50,
+            "market_pulse_analise": {
+              "direcao_sugerida": "AGUARDAR",
+              "confianca": 0.3,
+              "justificativa": "Market Pulse neutro: 50.0% positivas, VWΔ 0.10% - aguardando",
+              "executa_operacoes": false,
+              "metricas_utilizadas": {
+                "PM_PLUS": 50,
+                "PM_MINUS": 50,
+                "VWD": 0.1
+              },
+              "timestamp": "2025-08-23T01:11:25.704Z"
+            },
+            "justificativa": "IA: Mercado muito equilibrado - aguardar movimento mais claro - Aguardando clareza",
+            "analise_ia": {
+              "direcao_ia": "AGUARDAR",
+              "confianca": 0.3,
+              "justificativa": "Mercado muito equilibrado - aguardar movimento mais claro",
+              "autoriza_execucao": false,
+              "estatisticas": {
+                "total_chamadas_ia": 0,
+                "chamadas_economizadas": 0,
+                "taxa_economia": "0%",
+                "cache_size": 0,
+                "configuracao": {
+                  "modelo": "gpt-4o-mini",
+                  "max_tokens": 150,
+                  "temperatura": 0.1,
+                  "cache_ativo": true,
+                  "economia_ativa": true
+                }
+              }
+            }
+          },
+          "passou": true
+        }
+      ]
+    },
+    "performance": {
+      "total": 3,
+      "passou": 3,
+      "falhou": 0,
+      "detalhes": [
+        {
+          "teste": "TEMPO_ANALISE_COMPLETA",
+          "resultado": {
+            "passou": true,
+            "motivo": "Tempo OK: 104ms"
+          }
+        },
+        {
+          "teste": "MEMORIA_ESTAVEL",
+          "resultado": {
+            "passou": true,
+            "motivo": "Crescimento OK: -2.6%"
+          }
+        },
+        {
+          "teste": "ERROR_HANDLING",
+          "resultado": {
+            "passou": true,
+            "motivo": "Erro tratado corretamente com backup"
+          }
+        }
+      ]
+    },
+    "regras_negocio": {
+      "total": 5,
+      "passou": 5,
+      "falhou": 0,
+      "detalhes": [
+        {
+          "regra": "NUNCA_EXECUTAR_NEUTRO",
+          "resultado": {
+            "passou": true,
+            "motivo": "Nenhuma operação neutra executada"
+          }
+        },
+        {
+          "regra": "CONFIANCA_MINIMA_EXECUCAO",
+          "resultado": {
+            "passou": true,
+            "motivo": "Confiança adequada para execução"
+          }
+        },
+        {
+          "regra": "FEAR_GREED_PRIORIDADE",
+          "resultado": {
+            "passou": true,
+            "motivo": "Fear & Greed extremo corretamente priorizado"
+          }
+        },
+        {
+          "regra": "MARKET_PULSE_METRICAS",
+          "resultado": {
+            "passou": true,
+            "motivo": "Métricas Market Pulse corretas"
+          }
+        },
+        {
+          "regra": "ZONA_NEUTRA_IA",
+          "resultado": {
+            "passou": true,
+            "motivo": "Zona neutra corretamente identificada"
+          }
+        }
+      ]
+    },
+    "sistema_integrado": {
+      "total": 6,
+      "passou": 6,
+      "falhou": 0,
+      "detalhes": [
+        {
+          "teste": "VALIDACAO_SEGURANCA_INTEGRADA",
+          "resultado": {
+            "passou": true,
+            "motivo": "Validação de segurança corrigiu decisão problemática"
+          }
+        },
+        {
+          "teste": "FLUXO_COMPLETO_FEAR_GREED_EXTREMO",
+          "resultado": {
+            "passou": true,
+            "motivo": "Fluxo Fear & Greed extremo funcionando"
+          }
+        },
+        {
+          "teste": "COMPONENTES_INICIALIZADOS",
+          "resultado": {
+            "passou": true,
+            "motivo": "Todos os componentes inicializados"
+          }
+        },
+        {
+          "teste": "VALIDACAO_SEGURANCA_INTEGRADA",
+          "resultado": {
+            "passou": true,
+            "motivo": "Validação de segurança corrigiu decisão problemática"
+          }
+        },
+        {
+          "teste": "FLUXO_COMPLETO_FEAR_GREED_EXTREMO",
+          "resultado": {
+            "passou": true,
+            "motivo": "Fluxo Fear & Greed extremo funcionando"
+          }
+        },
+        {
+          "teste": "COMPONENTES_INICIALIZADOS",
+          "resultado": {
+            "passou": true,
+            "motivo": "Todos os componentes inicializados"
+          }
+        }
+      ]
+    }
+  },
+  "resumo": {
+    "total_categorias": 7,
+    "total_testes": 36,
+    "total_passou": 36,
+    "total_falhou": 0
+  }
+}

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 TESTE COMPLETO - Sistema Integrado</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a0e1a; color: #fff; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .title { font-size: 2rem; text-align: center; margin-bottom: 30px; background: linear-gradient(45deg, #00d4ff, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .test-section { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #475569; }
+        .test-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .test-item { background: #334155; border-radius: 8px; padding: 15px; border-left: 4px solid #64748b; }
+        .test-success { border-left-color: #10b981; }
+        .test-error { border-left-color: #ef4444; }
+        .test-warning { border-left-color: #f59e0b; }
+        .btn { background: linear-gradient(45deg, #00d4ff, #7c3aed); border: none; padding: 10px 20px; border-radius: 6px; color: white; cursor: pointer; margin: 5px; text-decoration: none; display: inline-block; }
+        .status { font-weight: bold; margin-left: 10px; }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .warning { color: #f59e0b; }
+        .response-data { background: #0f172a; padding: 10px; border-radius: 4px; margin-top: 10px; font-family: 'Consolas', monospace; font-size: 0.85rem; max-height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">🧪 TESTE COMPLETO DO SISTEMA INTEGRADO</h1>
+        
+        <div class="test-section">
+            <h2>📄 TESTE DE PÁGINAS INTEGRADAS</h2>
+            <div class="test-grid">
+                <div class="test-item" id="page-dashboard">
+                    <div>🏠 Dashboard Principal</div>
+                    <span class="status" id="status-dashboard">Testando...</span>
+                    <br><a href="/" target="_blank" class="btn">Abrir Página</a>
+                </div>
+                <div class="test-item" id="page-executivo">
+                    <div>📊 Dashboard Executivo</div>
+                    <span class="status" id="status-executivo">Testando...</span>
+                    <br><a href="/dashboard-executivo" target="_blank" class="btn">Abrir Página</a>
+                </div>
+                <div class="test-item" id="page-fluxo">
+                    <div>🔄 Fluxo Operacional</div>
+                    <span class="status" id="status-fluxo">Testando...</span>
+                    <br><a href="/fluxo-operacional" target="_blank" class="btn">Abrir Página</a>
+                </div>
+                <div class="test-item" id="page-usuarios">
+                    <div>👥 Usuários</div>
+                    <span class="status" id="status-usuarios">Testando...</span>
+                    <br><a href="/usuarios" target="_blank" class="btn">Abrir Página</a>
+                </div>
+                <div class="test-item" id="page-ia">
+                    <div>🤖 Sistema IA</div>
+                    <span class="status" id="status-ia">Testando...</span>
+                    <br><a href="/ia-trading" target="_blank" class="btn">Abrir Página</a>
+                </div>
+                <div class="test-item" id="page-aguia">
+                    <div>📰 Águia News</div>
+                    <span class="status" id="status-aguia">Testando...</span>
+                    <br><a href="/aguia-news" target="_blank" class="btn">Abrir Página</a>
+                </div>
+                <div class="test-item" id="page-alertas">
+                    <div>🚨 Alertas</div>
+                    <span class="status" id="status-alertas">Testando...</span>
+                    <br><a href="/alertas" target="_blank" class="btn">Abrir Página</a>
+                </div>
+                <div class="test-item" id="page-config">
+                    <div>⚙️ Configurações</div>
+                    <span class="status" id="status-config">Testando...</span>
+                    <br><a href="/configuracoes" target="_blank" class="btn">Abrir Página</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔌 TESTE DE APIs INTEGRADAS</h2>
+            <div class="test-grid">
+                <div class="test-item" id="api-health">
+                    <div>🏥 Health Check</div>
+                    <span class="status" id="status-api-health">Testando...</span>
+                    <div class="response-data" id="response-health"></div>
+                </div>
+                <div class="test-item" id="api-dados-completos">
+                    <div>📊 Dados Completos</div>
+                    <span class="status" id="status-api-dados">Testando...</span>
+                    <div class="response-data" id="response-dados"></div>
+                </div>
+                <div class="test-item" id="api-executivo">
+                    <div>💼 Dashboard Executivo</div>
+                    <span class="status" id="status-api-executivo">Testando...</span>
+                    <div class="response-data" id="response-executivo"></div>
+                </div>
+                <div class="test-item" id="api-fluxo">
+                    <div>🔄 Fluxo Operacional</div>
+                    <span class="status" id="status-api-fluxo">Testando...</span>
+                    <div class="response-data" id="response-fluxo"></div>
+                </div>
+                <div class="test-item" id="api-usuarios">
+                    <div>👥 Usuários</div>
+                    <span class="status" id="status-api-usuarios">Testando...</span>
+                    <div class="response-data" id="response-usuarios"></div>
+                </div>
+                <div class="test-item" id="api-ia">
+                    <div>🤖 IA Dashboard</div>
+                    <span class="status" id="status-api-ia">Testando...</span>
+                    <div class="response-data" id="response-ia"></div>
+                </div>
+                <div class="test-item" id="api-aguia">
+                    <div>📰 Águia News</div>
+                    <span class="status" id="status-api-aguia">Testando...</span>
+                    <div class="response-data" id="response-aguia"></div>
+                </div>
+                <div class="test-item" id="api-alertas">
+                    <div>🚨 Alertas</div>
+                    <span class="status" id="status-api-alertas">Testando...</span>
+                    <div class="response-data" id="response-alertas"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 VERIFICAÇÃO DE DADOS MOCK/ESTÁTICOS</h2>
+            <div id="mock-check">
+                <p>✅ <strong>Validação:</strong> Verificando se há dados simulados ou estáticos...</p>
+                <div id="mock-results"></div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="btn" onclick="executarTodosTestes()">🧪 Executar Todos os Testes</button>
+            <button class="btn" onclick="location.reload()">🔄 Atualizar Testes</button>
+        </div>
+    </div>
+
+    <script>
+        // Teste de páginas
+        async function testarPagina(url, statusId, itemId) {
+            try {
+                const response = await fetch(url);
+                const statusElement = document.getElementById(statusId);
+                const itemElement = document.getElementById(itemId);
+                
+                if (response.ok) {
+                    statusElement.textContent = '✅ OK';
+                    statusElement.className = 'status success';
+                    itemElement.classList.add('test-success');
+                } else {
+                    statusElement.textContent = '❌ Erro ' + response.status;
+                    statusElement.className = 'status error';
+                    itemElement.classList.add('test-error');
+                }
+            } catch (error) {
+                const statusElement = document.getElementById(statusId);
+                const itemElement = document.getElementById(itemId);
+                statusElement.textContent = '❌ Falha: ' + error.message;
+                statusElement.className = 'status error';
+                itemElement.classList.add('test-error');
+            }
+        }
+
+        // Teste de APIs
+        async function testarAPI(url, statusId, responseId, itemId) {
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                const statusElement = document.getElementById(statusId);
+                const responseElement = document.getElementById(responseId);
+                const itemElement = document.getElementById(itemId);
+                
+                if (response.ok && data.success !== false) {
+                    statusElement.textContent = '✅ OK';
+                    statusElement.className = 'status success';
+                    itemElement.classList.add('test-success');
+                    responseElement.textContent = JSON.stringify(data, null, 2);
+                    
+                    // Verificar dados mock
+                    verificarDadosMock(data, responseId);
+                } else {
+                    statusElement.textContent = '❌ Erro';
+                    statusElement.className = 'status error';
+                    itemElement.classList.add('test-error');
+                    responseElement.textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                const statusElement = document.getElementById(statusId);
+                const itemElement = document.getElementById(itemId);
+                statusElement.textContent = '❌ Falha: ' + error.message;
+                statusElement.className = 'status error';
+                itemElement.classList.add('test-error');
+                document.getElementById(responseId).textContent = 'Erro: ' + error.message;
+            }
+        }
+
+        // Verificar dados mock/estáticos
+        function verificarDadosMock(data, responseId) {
+            const dataStr = JSON.stringify(data);
+            const possiveisMock = [
+                'Math.random',
+                'BTCUSDT',
+                '45000',
+                'demo_user',
+                'test_',
+                'mock_',
+                'fake_',
+                'sample_'
+            ];
+            
+            const mockEncontrados = possiveisMock.filter(mock => dataStr.includes(mock));
+            
+            if (mockEncontrados.length > 0) {
+                const responseElement = document.getElementById(responseId);
+                responseElement.innerHTML += `<br><span style="color: #ef4444;">⚠️ POSSÍVEIS DADOS MOCK: ${mockEncontrados.join(', ')}</span>`;
+            }
+        }
+
+        // Executar todos os testes
+        async function executarTodosTestes() {
+            console.log('🧪 Iniciando testes completos...');
+            
+            // Teste de páginas
+            await testarPagina('/', 'status-dashboard', 'page-dashboard');
+            await testarPagina('/dashboard-executivo', 'status-executivo', 'page-executivo');
+            await testarPagina('/fluxo-operacional', 'status-fluxo', 'page-fluxo');
+            await testarPagina('/usuarios', 'status-usuarios', 'page-usuarios');
+            await testarPagina('/ia-trading', 'status-ia', 'page-ia');
+            await testarPagina('/aguia-news', 'status-aguia', 'page-aguia');
+            await testarPagina('/alertas', 'status-alertas', 'page-alertas');
+            await testarPagina('/configuracoes', 'status-config', 'page-config');
+            
+            // Teste de APIs
+            await testarAPI('/health', 'status-api-health', 'response-health', 'api-health');
+            await testarAPI('/api/painel/dados-completos', 'status-api-dados', 'response-dados', 'api-dados-completos');
+            await testarAPI('/api/painel/executivo', 'status-api-executivo', 'response-executivo', 'api-executivo');
+            await testarAPI('/api/painel/fluxo', 'status-api-fluxo', 'response-fluxo', 'api-fluxo');
+            await testarAPI('/api/painel/usuarios', 'status-api-usuarios', 'response-usuarios', 'api-usuarios');
+            await testarAPI('/api/ia/dashboard', 'status-api-ia', 'response-ia', 'api-ia');
+            await testarAPI('/api/aguia/dashboard', 'status-api-aguia', 'response-aguia', 'api-aguia');
+            await testarAPI('/api/painel/alertas', 'status-api-alertas', 'response-alertas', 'api-alertas');
+            
+            console.log('✅ Testes completos finalizados!');
+        }
+
+        // Executar testes automaticamente
+        window.onload = function() {
+            setTimeout(executarTodosTestes, 1000);
+        };
+    </script>
+</body>
+</html>

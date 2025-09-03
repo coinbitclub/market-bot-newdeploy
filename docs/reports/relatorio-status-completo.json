@@ -1,0 +1,43 @@
+{
+  "timestamp": "2025-08-09T21:51:47.566Z",
+  "sistema_core": {
+    "status": "OPERACIONAL",
+    "railway_ativo": true,
+    "ip_atual": "131.0.31.147",
+    "modulos_carregados": 8,
+    "banco_conectado": true
+  },
+  "usuarios": {
+    "total": 3,
+    "carregados": true,
+    "chaves_presentes": true,
+    "conexoes_ativas": 0
+  },
+  "problemas": {
+    "descriptografia": {
+      "status": "CRÍTICO",
+      "erro": "bad decrypt",
+      "impacto": "0% conexões"
+    },
+    "ip_fixo": {
+      "status": "BLOQUEADO",
+      "conta_digitalocean": "bloqueada",
+      "alternativas": [
+        "AWS",
+        "Linode",
+        "Vultr"
+      ]
+    }
+  },
+  "contingencia": {
+    "monitor_ip": true,
+    "sistema_simulacao": true,
+    "documentacao": true,
+    "tempo_estimado": "1-7 dias"
+  },
+  "proximas_acoes": [
+    "Corrigir descriptografia (CRÍTICO)",
+    "Resolver DigitalOcean (PARALELO)",
+    "Ativar sistema completo (FINAL)"
+  ]
+}

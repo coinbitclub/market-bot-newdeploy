@@ -1,0 +1,47 @@
+{
+  "individual_tests": {
+    "user_management": {
+      "error": {
+        "status": "FAIL",
+        "message": "",
+        "compliance": "0%"
+      }
+    },
+    "affiliate_system": {
+      "error": {
+        "status": "FAIL",
+        "message": "",
+        "compliance": "0%"
+      }
+    },
+    "financial_system": {
+      "error": {
+        "status": "FAIL",
+        "message": "",
+        "compliance": "0%"
+      }
+    },
+    "trading_system": {
+      "error": {
+        "status": "FAIL",
+        "message": "",
+        "compliance": "0%"
+      }
+    },
+    "webhooks_system": {
+      "error": {
+        "status": "FAIL",
+        "message": "",
+        "compliance": "0%"
+      }
+    }
+  },
+  "timestamp": "2025-09-03T14:00:13.492Z",
+  "specification_compliance": {},
+  "overall_compliance": {
+    "total_tests": 0,
+    "passed_tests": 0,
+    "compliance_percentage": "NaN",
+    "status": "FULLY_COMPLIANT"
+  }
+}

@@ -1,0 +1,384 @@
+{
+  "timestamp": "2025-09-03T13:58:01.357Z",
+  "specification_compliance": "COMPLIANT",
+  "results": [
+    {
+      "suite": "user_management",
+      "test": "Perfis de Usuário Conforme Especificação",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "profiles": [
+          "ADMIN",
+          "GESTOR",
+          "OPERADOR",
+          "AFFILIATE_VIP",
+          "AFFILIATE"
+        ]
+      }
+    },
+    {
+      "suite": "user_management",
+      "test": "Tipos de Saldo (6 conforme especificação)",
+      "passed": false,
+      "error": "HTTP 401: {\"error\":\"Token não fornecido\"}"
+    },
+    {
+      "suite": "user_management",
+      "test": "Sistema de Autenticação",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "protection": "JWT active"
+      }
+    },
+    {
+      "suite": "affiliate_system",
+      "test": "Taxas de Comissão Conforme Especificação",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "rates": {
+          "standard": 0.015,
+          "premium": 0.05,
+          "conversion_bonus": 0.1
+        }
+      }
+    },
+    {
+      "suite": "affiliate_system",
+      "test": "Estrutura de Comissões",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "structure": {
+          "levels": [
+            {
+              "level": 1,
+              "rate": 0.015,
+              "plan": "standard"
+            },
+            {
+              "level": 1,
+              "rate": 0.05,
+              "plan": "premium"
+            }
+          ],
+          "payment_schedule": "monthly",
+          "minimum_payout": {
+            "brl": 50,
+            "usd": 10
+          }
+        }
+      }
+    },
+    {
+      "suite": "affiliate_system",
+      "test": "Bônus de Conversão (+10%)",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "bonus": 0.1
+      }
+    },
+    {
+      "suite": "financial_system",
+      "test": "Planos Stripe Conforme Especificação",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "plans": {
+          "brazil": 297,
+          "international": 50
+        }
+      }
+    },
+    {
+      "suite": "financial_system",
+      "test": "Stripe Health Check",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "status": {
+          "stripe": "HEALTHY",
+          "webhooks": "ACTIVE"
+        }
+      }
+    },
+    {
+      "suite": "financial_system",
+      "test": "Taxas de Comissão sobre LUCRO",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "rates": {
+          "monthly": 0.1,
+          "prepaid": 0.2,
+          "affiliate": 0.015,
+          "conversion_bonus": 0.1
+        }
+      }
+    },
+    {
+      "suite": "financial_system",
+      "test": "Regras de Saque (Especificação)",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "withdrawal_rules": {
+          "saldo_real": "PODE_SACAR",
+          "saldo_admin": "NAO_PODE_SACAR",
+          "saldo_comissao": "PODE_CONVERTER"
+        }
+      }
+    },
+    {
+      "suite": "payment_system",
+      "test": "Valores Mínimos de Recarga",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "minimums": {
+          "brl": 150,
+          "usd": 30
+        }
+      }
+    },
+    {
+      "suite": "payment_system",
+      "test": "Dias de Pagamento (5 e 20)",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "payment_days": [
+          5,
+          20
+        ]
+      }
+    },
+    {
+      "suite": "trading_system",
+      "test": "Trading Engine Status",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "status": {
+          "engine": "ACTIVE",
+          "ai_analysis": "ONLINE",
+          "positions": 0,
+          "max_positions": 2,
+          "cooldown_active": false
+        }
+      }
+    },
+    {
+      "suite": "trading_system",
+      "test": "Configurações de Risco Conforme Especificação",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "config": {
+          "max_positions": 2,
+          "risk_per_trade": 0.02,
+          "cooldown_minutes": 120,
+          "require_sl_tp": true,
+          "min_balance": 50
+        }
+      }
+    },
+    {
+      "suite": "trading_system",
+      "test": "IA Analysis Health (OpenAI GPT-4)",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "ai_status": {
+          "openai": "SIMULATED",
+          "model": "gpt-4",
+          "analysis_ready": true
+        }
+      }
+    },
+    {
+      "suite": "trading_system",
+      "test": "SL/TP Obrigatórios (Especificação)",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "sl_tp_required": true
+      }
+    },
+    {
+      "suite": "tradingview_webhooks",
+      "test": "Webhook Sinal LONG FORTE",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "response": {
+          "success": true,
+          "signal_processed": true,
+          "execution_result": {
+            "success": true,
+            "message": "Ordem BUY executada",
+            "orderData": {
+              "symbol": "BTCUSDT",
+              "side": "BUY",
+              "type": "MARKET",
+              "price": 67500,
+              "stopLoss": 66150,
+              "takeProfit": 70200,
+              "timestamp": "2025-09-03T13:58:04.082Z",
+              "orderId": "TEST_1756907884082",
+              "status": "FILLED",
+              "executedQty": 0.0003
+            },
+            "timestamp": "2025-09-03T13:58:04.082Z",
+            "mode": "TEST"
+          },
+          "ai_decision": "BUY",
+          "confidence": 40,
+          "market_analysis": "BULLISH"
+        }
+      }
+    },
+    {
+      "suite": "tradingview_webhooks",
+      "test": "Webhook Sinal SHORT FORTE",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "response": {
+          "success": true,
+          "signal_processed": true,
+          "execution_result": {
+            "success": false,
+            "message": "Decisão HOLD - não executado"
+          },
+          "ai_decision": "HOLD",
+          "confidence": 10,
+          "market_analysis": "BULLISH"
+        }
+      }
+    },
+    {
+      "suite": "tradingview_webhooks",
+      "test": "Validação Tempo 30s (Especificação)",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "validation": "Tempo validado"
+      }
+    },
+    {
+      "suite": "system_orchestration",
+      "test": "Sistema Status Overview",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "services": {
+          "trading": "ACTIVE",
+          "financial": "ACTIVE",
+          "affiliate": "ACTIVE",
+          "database": "CONNECTED"
+        }
+      }
+    },
+    {
+      "suite": "system_orchestration",
+      "test": "System Info Enterprise",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "info": {
+          "system": "CoinbitClub MarketBot Enterprise",
+          "version": "1.0.0",
+          "features": [
+            "Trading AI",
+            "Stripe Integration",
+            "Affiliate System"
+          ],
+          "exchanges": [
+            "Binance",
+            "Bybit"
+          ],
+          "uptime": 2.6551441,
+          "memory": {
+            "rss": 67620864,
+            "heapTotal": 32722944,
+            "heapUsed": 15868576,
+            "external": 2554444,
+            "arrayBuffers": 18965
+          }
+        }
+      }
+    },
+    {
+      "suite": "user_simulation",
+      "test": "Usuário Consulta Saldos",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "protection": "Authentication required"
+      }
+    },
+    {
+      "suite": "user_simulation",
+      "test": "Afiliado Consulta Comissões",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "protection": "Authentication required"
+      }
+    },
+    {
+      "suite": "user_simulation",
+      "test": "Admin Gera Cupom",
+      "passed": true,
+      "details": {
+        "validated": true,
+        "protection": "Admin authentication required"
+      }
+    }
+  ],
+  "summary": {
+    "total_tests": 24,
+    "passed_tests": 23,
+    "failed_tests": 1,
+    "compliance_rate": "95.8%",
+    "status": "COMPLIANT",
+    "suite_breakdown": {
+      "user_management": {
+        "passed": 2,
+        "total": 3
+      },
+      "affiliate_system": {
+        "passed": 3,
+        "total": 3
+      },
+      "financial_system": {
+        "passed": 4,
+        "total": 4
+      },
+      "payment_system": {
+        "passed": 2,
+        "total": 2
+      },
+      "trading_system": {
+        "passed": 4,
+        "total": 4
+      },
+      "tradingview_webhooks": {
+        "passed": 3,
+        "total": 3
+      },
+      "system_orchestration": {
+        "passed": 2,
+        "total": 2
+      },
+      "user_simulation": {
+        "passed": 3,
+        "total": 3
+      }
+    }
+  }
+}

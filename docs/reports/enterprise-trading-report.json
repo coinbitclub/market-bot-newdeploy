@@ -1,0 +1,312 @@
+{
+  "timestamp": "2025-08-08T18:19:40.641Z",
+  "system": {
+    "status": "ACTIVE",
+    "uptime": 10030,
+    "version": "1.0.0-enterprise"
+  },
+  "metrics": {
+    "totalUsers": 2,
+    "activeUsers": 2,
+    "totalOrders": 2,
+    "successfulOrders": 0,
+    "totalVolume": 0,
+    "totalPnL": 0,
+    "systemUptime": 1754677170611,
+    "successRate": "0.0"
+  },
+  "components": {
+    "orderEngine": {
+      "status": "ACTIVE"
+    },
+    "riskManager": {
+      "status": "ACTIVE"
+    },
+    "positionMonitor": {
+      "status": "ACTIVE",
+      "activePositions": 0
+    },
+    "orchestrator": {
+      "status": "ACTIVE",
+      "exchanges": 3
+    }
+  },
+  "users": {
+    "total": 2,
+    "active": 2,
+    "summary": [
+      {
+        "id": 14,
+        "name": "João Silva",
+        "accountType": "mainnet",
+        "activePositions": 0,
+        "totalPnL": 0,
+        "riskLevel": "HIGH"
+      },
+      {
+        "id": 15,
+        "name": "Maria Santos",
+        "accountType": "testnet",
+        "activePositions": 0,
+        "totalPnL": 0,
+        "riskLevel": "MEDIUM"
+      }
+    ]
+  },
+  "exchanges": {
+    "timestamp": "2025-08-08T18:19:40.641Z",
+    "orchestrator": {
+      "totalExchanges": 3,
+      "activeExchanges": 2,
+      "healthyExchanges": 2
+    },
+    "performance": {
+      "totalRequests": 0,
+      "successfulRequests": 0,
+      "failoverEvents": 0,
+      "averageLatency": 0,
+      "exchangeDistribution": {}
+    },
+    "exchanges": {
+      "binance": {
+        "name": "Binance",
+        "priority": 1,
+        "isActive": true,
+        "status": "HEALTHY",
+        "latency": 0,
+        "features": [
+          "spot",
+          "futures",
+          "margin"
+        ],
+        "symbolsCount": 4
+      },
+      "bybit": {
+        "name": "Bybit",
+        "priority": 2,
+        "isActive": true,
+        "status": "HEALTHY",
+        "latency": 0,
+        "features": [
+          "spot",
+          "futures",
+          "options"
+        ],
+        "symbolsCount": 4
+      },
+      "kucoin": {
+        "name": "Kucoin",
+        "priority": 3,
+        "isActive": false,
+        "status": "STANDBY",
+        "latency": 0,
+        "features": [
+          "spot",
+          "futures"
+        ],
+        "symbolsCount": 3
+      }
+    },
+    "routing": [
+      [
+        "BTCUSDT",
+        {
+          "primary": "binance",
+          "fallback": [
+            "bybit"
+          ],
+          "criteria": "lowest_latency"
+        }
+      ],
+      [
+        "ETHUSDT",
+        {
+          "primary": "binance",
+          "fallback": [
+            "bybit"
+          ],
+          "criteria": "highest_liquidity"
+        }
+      ],
+      [
+        "spot_orders",
+        {
+          "primary": "binance",
+          "fallback": [
+            "bybit",
+            "kucoin"
+          ],
+          "criteria": "lowest_fees"
+        }
+      ],
+      [
+        "futures_orders",
+        {
+          "primary": "bybit",
+          "fallback": [
+            "binance"
+          ],
+          "criteria": "best_execution"
+        }
+      ]
+    ]
+  },
+  "positions": {
+    "active": 0,
+    "metrics": {
+      "totalPositions": 0,
+      "closedPositions": 0,
+      "profitablePositions": 0,
+      "totalPnL": 0,
+      "alertsTriggered": 0,
+      "activePositions": 0,
+      "successRate": "0.0",
+      "averagePnL": 0
+    }
+  },
+  "detailedMetrics": {
+    "risk": {
+      "timestamp": "2025-08-08T18:19:40.641Z",
+      "usuarios": {
+        "14": {
+          "accountType": "mainnet",
+          "riskLevel": "HIGH",
+          "isActive": true,
+          "suspended": false,
+          "warningsCount": 3,
+          "totalViolations": 3,
+          "successRate": 100,
+          "maxDrawdown": 0
+        },
+        "15": {
+          "accountType": "testnet",
+          "riskLevel": "MEDIUM",
+          "isActive": true,
+          "suspended": false,
+          "warningsCount": 2,
+          "totalViolations": 2,
+          "successRate": 100,
+          "maxDrawdown": 0
+        }
+      },
+      "estatisticas": {
+        "totalUsuarios": 2,
+        "usuariosAtivos": 2,
+        "usuariosSuspensos": 0,
+        "totalViolacoes": 5,
+        "nivelRiscoMedio": "LOW"
+      }
+    },
+    "positions": {
+      "active": [],
+      "metrics": {
+        "totalPositions": 0,
+        "closedPositions": 0,
+        "profitablePositions": 0,
+        "totalPnL": 0,
+        "alertsTriggered": 0,
+        "activePositions": 0,
+        "successRate": "0.0",
+        "averagePnL": 0
+      }
+    },
+    "orchestrator": {
+      "timestamp": "2025-08-08T18:19:40.641Z",
+      "orchestrator": {
+        "totalExchanges": 3,
+        "activeExchanges": 2,
+        "healthyExchanges": 2
+      },
+      "performance": {
+        "totalRequests": 0,
+        "successfulRequests": 0,
+        "failoverEvents": 0,
+        "averageLatency": 0,
+        "exchangeDistribution": {}
+      },
+      "exchanges": {
+        "binance": {
+          "name": "Binance",
+          "priority": 1,
+          "isActive": true,
+          "status": "HEALTHY",
+          "latency": 0,
+          "features": [
+            "spot",
+            "futures",
+            "margin"
+          ],
+          "symbolsCount": 4
+        },
+        "bybit": {
+          "name": "Bybit",
+          "priority": 2,
+          "isActive": true,
+          "status": "HEALTHY",
+          "latency": 0,
+          "features": [
+            "spot",
+            "futures",
+            "options"
+          ],
+          "symbolsCount": 4
+        },
+        "kucoin": {
+          "name": "Kucoin",
+          "priority": 3,
+          "isActive": false,
+          "status": "STANDBY",
+          "latency": 0,
+          "features": [
+            "spot",
+            "futures"
+          ],
+          "symbolsCount": 3
+        }
+      },
+      "routing": [
+        [
+          "BTCUSDT",
+          {
+            "primary": "binance",
+            "fallback": [
+              "bybit"
+            ],
+            "criteria": "lowest_latency"
+          }
+        ],
+        [
+          "ETHUSDT",
+          {
+            "primary": "binance",
+            "fallback": [
+              "bybit"
+            ],
+            "criteria": "highest_liquidity"
+          }
+        ],
+        [
+          "spot_orders",
+          {
+            "primary": "binance",
+            "fallback": [
+              "bybit",
+              "kucoin"
+            ],
+            "criteria": "lowest_fees"
+          }
+        ],
+        [
+          "futures_orders",
+          {
+            "primary": "bybit",
+            "fallback": [
+              "binance"
+            ],
+            "criteria": "best_execution"
+          }
+        ]
+      ]
+    }
+  }
+}

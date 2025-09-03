@@ -1,0 +1,87 @@
+{
+  "timestamp": "2025-09-03T13:07:51.988Z",
+  "phase": "FASE 5 - VALIDAÇÃO E OTIMIZAÇÃO",
+  "tests": {
+    "enterpriseStructure": {
+      "valid": true,
+      "missing": [],
+      "present": [
+        "src/core",
+        "src/modules",
+        "src/services",
+        "src/utils",
+        "config/environments",
+        "scripts/analysis",
+        "scripts/verification",
+        "scripts/deployment",
+        "docs/reports"
+      ]
+    },
+    "enterpriseServices": {
+      "diContainer": false,
+      "logger": false,
+      "errorHandler": false,
+      "configManager": false,
+      "metricsCollector": false,
+      "featureFlags": false,
+      "secretsManager": false
+    },
+    "endpoints": {
+      "total": 6,
+      "passed": 0,
+      "failed": 0,
+      "details": []
+    },
+    "security": {
+      "secretsProtected": true,
+      "envFiles": [],
+      "exposedCredentials": 0,
+      "securityHeaders": false,
+      "encryptionActive": false
+    },
+    "fileOrganization": {
+      "totalFiles": 627,
+      "directoriesCreated": 22,
+      "errors": 0,
+      "reviewFiles": 134,
+      "organizationScore": 82
+    }
+  },
+  "performance": {
+    "memoryUsage": {
+      "rss": 48381952,
+      "heapTotal": 12120064,
+      "heapUsed": 8627696,
+      "external": 2070736,
+      "arrayBuffers": 19275
+    },
+    "cpuUsage": {
+      "user": 171000,
+      "system": 93000
+    },
+    "responseTime": 1,
+    "throughput": 0,
+    "score": 100
+  },
+  "security": {},
+  "endpoints": {},
+  "errors": [
+    {
+      "type": "SERVICE_VALIDATION",
+      "message": "ENCRYPTION_KEY não definida para ambiente de produção"
+    },
+    {
+      "type": "ENDPOINT_VALIDATION",
+      "message": "ENCRYPTION_KEY não definida para ambiente de produção"
+    }
+  ],
+  "recommendations": [
+    {
+      "type": "SERVICES",
+      "message": "Score de serviços baixo: 0%. Revisar implementações.",
+      "priority": "HIGH"
+    }
+  ],
+  "overallScore": 46,
+  "status": "NEEDS_IMPROVEMENT"
+}

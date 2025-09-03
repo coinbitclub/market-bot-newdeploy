@@ -1,0 +1,137 @@
+{
+  "name": "coinbitclub-market-bot-backend",
+  "version": "5.0.0",
+  "description": "Sistema de Trading Automatizado Multiusuário - Backend Enterprise Escalável",
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node main.js",
+    "app": "node app.js",
+    "dev": "nodemon main.js",
+    "test": "node final-system-validation.js",
+    "health": "node -e \"console.log('Sistema OK')\"",
+    "deploy": "railway up",
+    "validate": "node final-system-validation.js",
+    "production": "NODE_ENV=production node main.js"
+  },
+  "dependencies": {
+    "@binance/connector": "^3.1.0",
+    "axios": "^1.11.0",
+    "bcrypt": "^6.0.0",
+    "bull": "^4.12.0",
+    "bybit-api": "^4.2.0",
+    "compression": "^1.7.4",
+=======
+  "version": "1.0.0",
+  "workspaces": [
+    "api-gateway",
+    "signal-ingestor",
+    "signal-processor",
+    "decision-engine",
+    "order-executor",
+    "accounting",
+    "notifications",
+    "admin-panel"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:workspaces",
+    "install:workspaces": "npm install --workspaces",
+    "build": "cd api-gateway && npm install --production",
+    "start": "cd api-gateway && node server-production.cjs",
+    "start:production": "cd api-gateway && node server-production.cjs",
+    "start:workspaces": "npm run start --workspaces",
+    "dev": "concurrently \"npm run dev --workspace=api-gateway\" \"npm run dev --workspace=signal-ingestor\" \"npm run dev --workspace=signal-processor\" \"npm run dev --workspace=decision-engine\" \"npm run dev --workspace=order-executor\" \"npm run dev --workspace=accounting\" \"npm run dev --workspace=notifications\" \"npm run dev --workspace=admin-panel\"",
+    "test": "npm run test --workspaces",
+    "db:migrate": "npm run db:migrate --workspace=api-gateway",
+    "db:seed": "npm run db:seed --workspace=api-gateway",
+    "db:setup": "npm run db:setup --workspace=api-gateway",
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint . --ext .js --fix",
+    "ml:start": "node ml-services/launch-ml-services.js start",
+    "ml:stop": "node ml-services/launch-ml-services.js stop",
+    "ml:status": "node ml-services/launch-ml-services.js status",
+    "ml:help": "node ml-services/launch-ml-services.js help",
+    "ml:prediction": "node ml-services/prediction-service/ml-prediction-simple.js",
+    "ml:sentiment": "node ml-services/sentiment-service/sentiment-service.js",
+    "ml:anomaly": "node ml-services/anomaly-service/anomaly-service.js",
+    "ml:strategy": "node ml-services/strategy-service/strategy-service.js",
+    "ml:orchestrator": "node ml-services/ml-orchestrator.js",
+    "start:prod": "NODE_ENV=production node app.js",
+    "deploy": "bash deploy-production.sh",
+    "health": "curl http://localhost:3000/health"
+  },
+  "dependencies": {
+    "@binance/connector": "^3.6.1",
+    "axios": "^1.11.0",
+    "body-parser": "^2.2.0",
+    "bybit-api": "^4.2.1",
+    "ccxt": "^4.4.98",
+    "compression": "^1.8.1",
+>>>>>>> backup-pre-migration
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.3.1",
+<<<<<<< HEAD
+    "events": "^3.3.0",
+    "express": "^4.18.2",
+    "express-rate-limit": "^6.11.2",
+    "helmet": "^7.0.0",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "node-cron": "^3.0.3",
+    "openai": "^3.3.0",
+    "pg": "^8.11.3",
+    "prom-client": "^15.0.0",
+    "socket.io": "^4.8.1",
+    "stripe": "^12.18.0",
+    "twilio": "^4.14.0",
+    "ws": "^8.13.0",
+    "yaml": "^2.8.0"
+=======
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.0.1",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
+    "http-proxy-middleware": "^3.0.5",
+    "jsonwebtoken": "^9.0.2",
+    "ml-matrix": "^6.12.1",
+    "ml-regression": "^6.3.0",
+    "ml-regression-polynomial": "^3.0.2",
+    "node-cron": "^4.2.1",
+    "node-telegram-bot-api": "^0.66.0",
+    "nodemailer": "^7.0.5",
+    "pg": "^8.16.3",
+    "qrcode": "^1.5.4",
+    "redis": "^5.8.0",
+    "simple-statistics": "^7.8.8",
+    "speakeasy": "^2.0.0",
+    "stripe": "^18.3.0",
+    "technicalindicators": "^3.1.0",
+    "twilio": "^5.8.0",
+    "uuid": "^11.1.0",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
+>>>>>>> backup-pre-migration
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "trading",
+    "cryptocurrency",
+    "automated",
+    "multiuser",
+    "bybit",
+    "binance",
+    "enterprise"
+  ],
+  "author": "CoinBitClub",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coinbitclub/coinbitclub-market-bot.git"
+  }
+}

@@ -1,0 +1,295 @@
+version: '3.8'
+
+services:
+  # Load Balancer
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
+      - ./config/ssl:/etc/nginx/ssl
+    depends_on:
+      - app
+    networks:
+      - coinbitclub-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # Application (Auto-scaling 1-16 replicas)
+  app:
+    build: .
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://coinbitclub:coinbitclub_secure_2025@postgres:5432/coinbitclub_enterprise
+      - REDIS_URL=redis://redis-cluster:6379
+      - AI_API_KEY=sk-test-api-key
+      - BINANCE_API_KEY=test-binance-key
+      - BINANCE_SECRET=test-binance-secret
+      - BYBIT_API_KEY=test-bybit-key
+      - BYBIT_SECRET=test-bybit-secret
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - coinbitclub-network
+    depends_on:
+      - postgres
+      - redis-cluster
+    deploy:
+      replicas: 8
+      update_config:
+        parallelism: 2
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4'
+        reservations:
+          memory: 4G
+          cpus: '2'
+
+  # Database Master
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=coinbitclub_enterprise
+      - POSTGRES_USER=coinbitclub
+      - POSTGRES_PASSWORD=coinbitclub_secure_2025
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
+    ports:
+      - "5432:5432"
+    networks:
+      - coinbitclub-network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 16G
+          cpus: '8'
+        reservations:
+          memory: 8G
+          cpus: '4'
+
+  # Database Read Replicas
+  postgres-replica-1:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=coinbitclub_enterprise
+      - POSTGRES_USER=coinbitclub
+      - POSTGRES_PASSWORD=coinbitclub_secure_2025
+      - PGUSER=postgres
+      - POSTGRES_MASTER_SERVICE=postgres
+    volumes:
+      - postgres_replica1_data:/var/lib/postgresql/data
+    networks:
+      - coinbitclub-network
+    depends_on:
+      - postgres
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4'
+        reservations:
+          memory: 4G
+          cpus: '2'
+
+  postgres-replica-2:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=coinbitclub_enterprise
+      - POSTGRES_USER=coinbitclub
+      - POSTGRES_PASSWORD=coinbitclub_secure_2025
+      - PGUSER=postgres
+      - POSTGRES_MASTER_SERVICE=postgres
+    volumes:
+      - postgres_replica2_data:/var/lib/postgresql/data
+    networks:
+      - coinbitclub-network
+    depends_on:
+      - postgres
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4'
+        reservations:
+          memory: 4G
+          cpus: '2'
+
+  postgres-replica-3:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=coinbitclub_enterprise
+      - POSTGRES_USER=coinbitclub
+      - POSTGRES_PASSWORD=coinbitclub_secure_2025
+      - PGUSER=postgres
+      - POSTGRES_MASTER_SERVICE=postgres
+    volumes:
+      - postgres_replica3_data:/var/lib/postgresql/data
+    networks:
+      - coinbitclub-network
+    depends_on:
+      - postgres
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4'
+        reservations:
+          memory: 4G
+          cpus: '2'
+
+  # Redis Cluster (3 nodes)
+  redis-cluster:
+    image: redis:7-alpine
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --maxmemory 4gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - coinbitclub-network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2'
+        reservations:
+          memory: 2G
+          cpus: '1'
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - coinbitclub-network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=grafana_admin_2025
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - coinbitclub-network
+    depends_on:
+      - prometheus
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # Log Management - ELK Stack
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - coinbitclub-network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2'
+        reservations:
+          memory: 2G
+          cpus: '1'
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    volumes:
+      - ./config/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    networks:
+      - coinbitclub-network
+    depends_on:
+      - elasticsearch
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - coinbitclub-network
+    depends_on:
+      - elasticsearch
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+volumes:
+  postgres_data:
+  postgres_replica1_data:
+  postgres_replica2_data:
+  postgres_replica3_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+
+networks:
+  coinbitclub-network:
+    driver: overlay
+    attachable: true

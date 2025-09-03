@@ -1,0 +1,56 @@
+
+# Arquivos de ambiente e credenciais
+.env
+.env.local
+.env.production
+.env.staging
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Backups e arquivos temporários
+BACKUP_*
+backup-*
+temp-*
+*.backup
+*.tmp
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependências
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-*
+
+# Arquivos de build
+dist/
+build/
+*.tgz
+
+# Dados sensíveis específicos do projeto
+security-audit-*.json
+*-credentials.json
+*-keys.json
+database-dump.sql
+
+# Arquivos MD com dados sensíveis (temporário)
+Arquivos MD/ALERTA-SEGURANCA-CRITICO.md
+Arquivos MD/SISTEMA-*-OPERACIONAL.md
+Arquivos MD/PRODUCTION-READY-*.md

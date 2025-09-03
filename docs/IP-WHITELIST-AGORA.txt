@@ -1,0 +1,36 @@
+🚨 AÇÃO IMEDIATA NECESSÁRIA - WHITELIST DO IP
+=============================================
+
+📍 IP PARA ADICIONAR: 131.0.31.147
+
+🎯 PASSO A PASSO:
+
+1️⃣ BYBIT (Usuário 14 - Luiza Maria):
+   → Acesse: https://www.bybit.com/app/user/api-management
+   → Encontre a API key da Luiza
+   → Clique em "Edit" 
+   → Vá em "IP Restriction"
+   → Adicione: 131.0.31.147
+   → Salve
+
+2️⃣ BINANCE (Usuário 16 - Erica):
+   → Acesse: https://www.binance.com/en/my/settings/api-management  
+   → Encontre a API key da Erica
+   → Clique em "Edit restrictions"
+   → Adicione: 131.0.31.147
+   → Salve
+
+3️⃣ CONFIGURAR UNIFIED ACCOUNTS (Usuários 15 e 16):
+   → Nas contas Bybit, ativar "Unified Trading Account"
+   → Aguardar 5-10 minutos para ativação
+
+4️⃣ AGUARDAR PROPAGAÇÃO:
+   → 10 minutos após fazer as alterações
+   → Verificar logs do sistema
+
+⏰ TEMPO TOTAL: ~15 minutos
+
+🎯 DEPOIS EXECUTE: node verificar-pos-correcao.js
+
+💡 IMPORTANTE: O IP 131.0.31.147 é o IP atual do seu servidor.
+   Adicione exatamente este IP nas duas exchanges.

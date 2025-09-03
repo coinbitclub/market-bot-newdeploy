@@ -1,0 +1,147 @@
+{
+  "startTime": "2025-08-22T23:44:01.236Z",
+  "endTime": "2025-08-22T23:44:01.867Z",
+  "success": true,
+  "phases": [
+    {
+      "phase": "dependency_check",
+      "status": "success",
+      "timestamp": "2025-08-22T23:44:01.821Z",
+      "details": {
+        "directories_verified": 2,
+        "files_verified": 2
+      }
+    },
+    {
+      "phase": "backup",
+      "status": "success",
+      "timestamp": "2025-08-22T23:44:01.843Z",
+      "details": {
+        "backup_directory": "backups\\terms-system-2025-08-22T23-44-01-822Z",
+        "files_backed_up": 4
+      }
+    },
+    {
+      "phase": "database_migration",
+      "status": "success",
+      "timestamp": "2025-08-22T23:44:01.846Z",
+      "details": {
+        "migration_file": "./migrate-terms-system.sql",
+        "tables_to_create": 3,
+        "functions_to_create": 2
+      }
+    },
+    {
+      "phase": "api_integration",
+      "status": "success",
+      "timestamp": "2025-08-22T23:44:01.851Z",
+      "details": {
+        "api_file": "routes\\terms-api.js",
+        "endpoints_count": 9,
+        "app_js_updated": true
+      }
+    },
+    {
+      "phase": "frontend_configuration",
+      "status": "success",
+      "timestamp": "2025-08-22T23:44:01.859Z",
+      "details": {
+        "components_directory": "./frontend/components/terms",
+        "components_added": 2,
+        "config_file": "frontend\\components\\terms\\terms-config.json"
+      }
+    },
+    {
+      "phase": "functionality_tests",
+      "status": "success",
+      "timestamp": "2025-08-22T23:44:01.865Z",
+      "details": {
+        "tests_passed": 5,
+        "tests_total": 5,
+        "success_rate": "100.0%"
+      }
+    },
+    {
+      "phase": "compliance_validation",
+      "status": "success",
+      "timestamp": "2025-08-22T23:44:01.866Z",
+      "details": {
+        "compliance_elements_found": 6,
+        "compliance_elements_total": 6,
+        "compliance_rate": "100.0%",
+        "audit_features": [
+          "IP address logging",
+          "User agent tracking",
+          "Timestamp recording",
+          "Metadata storage",
+          "Version control"
+        ]
+      }
+    }
+  ],
+  "files": {
+    "created": [
+      "./migrate-terms-system.sql",
+      "./routes/terms-api.js",
+      "frontend\\components\\terms\\TermsAcceptanceModal.jsx",
+      "frontend\\components\\terms\\TermsAdminManager.jsx",
+      "frontend\\components\\terms\\terms-config.json"
+    ],
+    "modified": [],
+    "backed_up": [
+      "./app.js",
+      "routes\\affiliate-api.js",
+      "routes\\api.js",
+      "routes\\terms-api.js"
+    ]
+  },
+  "database": {
+    "tables_created": [
+      "terms_versions",
+      "user_terms_acceptance",
+      "terms_acceptance_log"
+    ],
+    "functions_created": [
+      "register_terms_acceptance()",
+      "check_user_terms_status()"
+    ],
+    "views_created": [
+      "v_user_terms_status",
+      "v_terms_compliance_report"
+    ]
+  },
+  "apis": {
+    "endpoints_added": [
+      "GET /api/terms/current",
+      "POST /api/terms/accept",
+      "GET /api/terms/user/:id/status",
+      "GET /api/terms/dashboard",
+      "POST /api/terms/admin/create-version",
+      "PUT /api/terms/admin/activate/:id",
+      "GET /api/terms/admin/versions",
+      "GET /api/terms/admin/compliance-report",
+      "GET /api/terms/health"
+    ],
+    "routes_integrated": []
+  },
+  "frontend": {
+    "components_added": [
+      "TermsAcceptanceModal.jsx",
+      "TermsAdminManager.jsx"
+    ],
+    "integrations_made": []
+  },
+  "tests": {
+    "passed": [
+      "Arquivo da API criado",
+      "Arquivo de migração criado",
+      "Componentes frontend criados",
+      "Configuração frontend criada",
+      "app.js contém integração"
+    ],
+    "failed": []
+  },
+  "errors": [],
+  "warnings": [],
+  "duration": 631
+}

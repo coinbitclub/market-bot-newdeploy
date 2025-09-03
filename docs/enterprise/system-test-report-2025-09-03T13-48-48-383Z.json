@@ -1,0 +1,67 @@
+{
+  "timestamp": "2025-09-03T13:48:47.644Z",
+  "system_status": "PARTIALLY_OPERATIONAL",
+  "tests": [
+    {
+      "test": "file_structure",
+      "passed": true,
+      "timestamp": "2025-09-03T13:48:47.654Z",
+      "details": {
+        "total_files": 5,
+        "found_files": 5,
+        "missing_files": 0
+      }
+    },
+    {
+      "test": "core_endpoints",
+      "passed": true,
+      "timestamp": "2025-09-03T13:48:48.321Z",
+      "details": {
+        "total_endpoints": 3,
+        "passed_endpoints": 3
+      }
+    },
+    {
+      "test": "financial_system",
+      "passed": false,
+      "timestamp": "2025-09-03T13:48:48.332Z",
+      "details": {
+        "total_tests": 3,
+        "passed_tests": 2
+      }
+    },
+    {
+      "test": "trading_engine",
+      "passed": true,
+      "timestamp": "2025-09-03T13:48:48.347Z",
+      "details": {
+        "total_tests": 3,
+        "passed_tests": 3
+      }
+    },
+    {
+      "test": "affiliate_system",
+      "passed": true,
+      "timestamp": "2025-09-03T13:48:48.355Z",
+      "details": {
+        "total_tests": 2,
+        "passed_tests": 2
+      }
+    },
+    {
+      "test": "tradingview_webhooks",
+      "passed": false,
+      "timestamp": "2025-09-03T13:48:48.383Z",
+      "details": {
+        "error": "HTTP 500: {\"error\":\"Erro interno do servidor\"}"
+      }
+    }
+  ],
+  "summary": {
+    "total_tests": 6,
+    "passed_tests": 4,
+    "failed_tests": 2,
+    "success_rate": "66.7%",
+    "status": "PARTIALLY_OPERATIONAL"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "CoinBitClub Enterprise",
+    "tags": [
+      "enterprise",
+      "trading"
+    ],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Active Users",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(coinbitclub_active_users)",
+            "legendFormat": "Users"
+          }
+        ]
+      },
+      {
+        "title": "Response Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "avg(coinbitclub_request_duration_seconds)",
+            "legendFormat": "Response Time"
+          }
+        ]
+      },
+      {
+        "title": "Trading Volume",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(coinbitclub_trading_volume_total)",
+            "legendFormat": "Volume"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s"
+  }
+}

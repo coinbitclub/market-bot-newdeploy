@@ -1,0 +1,142 @@
+{
+  "timestamp": "2025-08-08T18:16:35.513Z",
+  "metrics": {
+    "totalPositions": 3,
+    "closedPositions": 0,
+    "profitablePositions": 0,
+    "totalPnL": 0,
+    "alertsTriggered": 0,
+    "activePositions": 3,
+    "successRate": "0.0",
+    "averagePnL": 0
+  },
+  "activePositions": [
+    {
+      "id": "pos_1754676965503_s4xphbfjg",
+      "user_id": 14,
+      "symbol": "BTCUSDT",
+      "side": "BUY",
+      "quantity": 0.1,
+      "entryPrice": 50000,
+      "currentPrice": 50362.53098903506,
+      "leverage": 1,
+      "notionalValue": 5000,
+      "unrealizedPnL": 36.25309890350618,
+      "unrealizedPnLPercent": 0.7250619780701236,
+      "stopLoss": 49000,
+      "takeProfit": 52000,
+      "trailingStop": null,
+      "openTime": "2025-08-08T18:16:05.503Z",
+      "lastUpdate": "2025-08-08T18:16:32.582Z",
+      "exchange": "binance",
+      "status": "ACTIVE",
+      "alerts": {
+        "priceAlert": null,
+        "timeAlert": null,
+        "pnlAlert": null
+      }
+    },
+    {
+      "id": "pos_1754676965504_bps53226r",
+      "user_id": 15,
+      "symbol": "ETHUSDT",
+      "side": "SELL",
+      "quantity": 1,
+      "entryPrice": 3000,
+      "currentPrice": 2953.230052200863,
+      "leverage": 1,
+      "notionalValue": 3000,
+      "unrealizedPnL": 46.769947799136844,
+      "unrealizedPnLPercent": 1.5589982599712282,
+      "stopLoss": 3003.230052200863,
+      "takeProfit": null,
+      "trailingStop": {
+        "distance": 50
+      },
+      "openTime": "2025-08-08T18:16:05.504Z",
+      "lastUpdate": "2025-08-08T18:16:32.582Z",
+      "exchange": "binance",
+      "status": "ACTIVE",
+      "alerts": {
+        "priceAlert": null,
+        "timeAlert": null,
+        "pnlAlert": null
+      }
+    },
+    {
+      "id": "pos_1754676965505_13wwnz26z",
+      "user_id": 16,
+      "symbol": "BNBUSDT",
+      "side": "BUY",
+      "quantity": 10,
+      "entryPrice": 300,
+      "currentPrice": 305.11523994985,
+      "leverage": 1,
+      "notionalValue": 3000,
+      "unrealizedPnL": 51.15239949849979,
+      "unrealizedPnLPercent": 1.7050799832833263,
+      "stopLoss": null,
+      "takeProfit": null,
+      "trailingStop": null,
+      "openTime": "2025-08-08T18:16:05.505Z",
+      "lastUpdate": "2025-08-08T18:16:32.582Z",
+      "exchange": "binance",
+      "status": "ACTIVE",
+      "alerts": {
+        "priceAlert": null,
+        "timeAlert": null,
+        "pnlAlert": null
+      }
+    }
+  ],
+  "userSummary": {
+    "14": {
+      "userId": 14,
+      "activePositions": 1,
+      "totalUnrealizedPnL": 36.25309890350618,
+      "totalNotionalValue": 5000,
+      "positions": [
+        {
+          "id": "pos_1754676965503_s4xphbfjg",
+          "symbol": "BTCUSDT",
+          "side": "BUY",
+          "unrealizedPnL": 36.25309890350618,
+          "unrealizedPnLPercent": 0.7250619780701236,
+          "currentPrice": 50362.53098903506
+        }
+      ]
+    },
+    "15": {
+      "userId": 15,
+      "activePositions": 1,
+      "totalUnrealizedPnL": 46.769947799136844,
+      "totalNotionalValue": 3000,
+      "positions": [
+        {
+          "id": "pos_1754676965504_bps53226r",
+          "symbol": "ETHUSDT",
+          "side": "SELL",
+          "unrealizedPnL": 46.769947799136844,
+          "unrealizedPnLPercent": 1.5589982599712282,
+          "currentPrice": 2953.230052200863
+        }
+      ]
+    },
+    "16": {
+      "userId": 16,
+      "activePositions": 1,
+      "totalUnrealizedPnL": 51.15239949849979,
+      "totalNotionalValue": 3000,
+      "positions": [
+        {
+          "id": "pos_1754676965505_13wwnz26z",
+          "symbol": "BNBUSDT",
+          "side": "BUY",
+          "unrealizedPnL": 51.15239949849979,
+          "unrealizedPnLPercent": 1.7050799832833263,
+          "currentPrice": 305.11523994985
+        }
+      ]
+    }
+  }
+}

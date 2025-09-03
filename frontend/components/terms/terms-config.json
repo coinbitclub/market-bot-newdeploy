@@ -1,0 +1,16 @@
+{
+  "termsSystem": {
+    "enabled": true,
+    "mandatoryAcceptance": true,
+    "autoCheckOnLogin": true,
+    "components": {
+      "modal": "TermsAcceptanceModal",
+      "admin": "TermsAdminManager"
+    },
+    "apiEndpoints": {
+      "current": "/api/terms/current",
+      "accept": "/api/terms/accept",
+      "status": "/api/terms/user/{userId}/status"
+    }
+  }
+}

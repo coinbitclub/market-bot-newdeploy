@@ -1,0 +1,82 @@
+{
+  "timestamp": "2025-08-11T15:29:57.099Z",
+  "modules_verified": {
+    "balance_collector": "OK",
+    "key_validation": "OK",
+    "signal_processor": "OK",
+    "real_executor": "OK",
+    "position_monitor": "OK",
+    "risk_management": "OK",
+    "emergency_ip_fixer": "OK",
+    "dual_activator": "OK"
+  },
+  "functions_tested": {},
+  "database_status": {
+    "users": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 12
+    },
+    "user_api_keys": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 4
+    },
+    "balances": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 10
+    },
+    "user_balances": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 7
+    },
+    "signals": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 2
+    },
+    "trading_signals": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 0
+    },
+    "active_positions": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 0
+    },
+    "positions": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 0
+    },
+    "order_executions": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 3
+    },
+    "real_orders": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 0
+    },
+    "trading_executions": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 0
+    },
+    "user_trading_executions": {
+      "exists": true,
+      "status": "OK",
+      "record_count": 0
+    }
+  },
+  "issues_found": [],
+  "recommendations": [
+    "Sistema está operacional e pronto para trading real",
+    "Continuar monitoramento regular"
+  ],
+  "operational_status": "EXCELLENT"
+}

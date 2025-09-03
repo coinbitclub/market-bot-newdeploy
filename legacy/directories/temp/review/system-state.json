@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-08-11T17:13:20.109Z",
+  "stats": {
+    "totalKeys": 0,
+    "validatedKeys": 0,
+    "failedKeys": 0,
+    "activeConnections": 0,
+    "lastValidation": "2025-08-11T16:55:20.744Z",
+    "uptime": 1754931320731
+  },
+  "ip": "132.255.160.131",
+  "validatedConnections": [],
+  "activeInstances": []
+}

@@ -1,0 +1,86 @@
+{
+  "timestamp": "2025-08-11T17:21:05.918Z",
+  "systemStats": {
+    "totalKeys": 0,
+    "validatedKeys": 0,
+    "failedKeys": 0,
+    "activeConnections": 0,
+    "activeExecutors": 0,
+    "totalTrades": 0,
+    "successfulTrades": 0,
+    "lastValidation": "2025-08-11T17:20:51.517Z",
+    "uptime": 1754932547700,
+    "errors": [
+      {
+        "timestamp": "2025-08-11T17:15:51.498Z",
+        "type": "FETCH_KEYS_ERROR",
+        "message": "column uak.error_details does not exist",
+        "stack": "error: column uak.error_details does not exist\n    at C:\\Nova pasta\\coinbitclub-market-bot\\backend\\node_modules\\pg-pool\\index.js:45:11\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async SistemaProfissionalCompleto.fetchAllApiKeys (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:553:28)\n    at async SistemaProfissionalCompleto.executeCompleteValidation (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:734:29)\n    at async SistemaProfissionalCompleto.startCompleteSystem (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:1287:38)",
+        "systemState": {
+          "validatedConnections": 0,
+          "activeExecutors": 0,
+          "uptime": 3801
+        }
+      },
+      {
+        "timestamp": "2025-08-11T17:15:51.502Z",
+        "type": "COMPLETE_VALIDATION_ERROR",
+        "message": "column uak.error_details does not exist",
+        "stack": "error: column uak.error_details does not exist\n    at C:\\Nova pasta\\coinbitclub-market-bot\\backend\\node_modules\\pg-pool\\index.js:45:11\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async SistemaProfissionalCompleto.fetchAllApiKeys (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:553:28)\n    at async SistemaProfissionalCompleto.executeCompleteValidation (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:734:29)\n    at async SistemaProfissionalCompleto.startCompleteSystem (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:1287:38)",
+        "systemState": {
+          "validatedConnections": 0,
+          "activeExecutors": 0,
+          "uptime": 3802
+        }
+      },
+      {
+        "timestamp": "2025-08-11T17:20:53.693Z",
+        "type": "FETCH_KEYS_ERROR",
+        "message": "column uak.error_details does not exist",
+        "stack": "error: column uak.error_details does not exist\n    at C:\\Nova pasta\\coinbitclub-market-bot\\backend\\node_modules\\pg-pool\\index.js:45:11\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async SistemaProfissionalCompleto.fetchAllApiKeys (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:553:28)\n    at async SistemaProfissionalCompleto.executeCompleteValidation (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:734:29)\n    at async Timeout._onTimeout (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:1227:13)",
+        "systemState": {
+          "validatedConnections": 0,
+          "activeExecutors": 0,
+          "uptime": 305993
+        }
+      },
+      {
+        "timestamp": "2025-08-11T17:20:53.694Z",
+        "type": "COMPLETE_VALIDATION_ERROR",
+        "message": "column uak.error_details does not exist",
+        "stack": "error: column uak.error_details does not exist\n    at C:\\Nova pasta\\coinbitclub-market-bot\\backend\\node_modules\\pg-pool\\index.js:45:11\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async SistemaProfissionalCompleto.fetchAllApiKeys (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:553:28)\n    at async SistemaProfissionalCompleto.executeCompleteValidation (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:734:29)\n    at async Timeout._onTimeout (C:\\Nova pasta\\coinbitclub-market-bot\\backend\\sistema-profissional-completo.js:1227:13)",
+        "systemState": {
+          "validatedConnections": 0,
+          "activeExecutors": 0,
+          "uptime": 305994
+        }
+      }
+    ]
+  },
+  "currentIP": "132.255.160.131",
+  "validatedConnections": [],
+  "activeExecutors": [],
+  "config": {
+    "validation": {
+      "intervalMs": 300000,
+      "retryAttempts": 5,
+      "timeoutMs": 45000,
+      "healthCheckIntervalMs": 60000
+    },
+    "trading": {
+      "enabled": false,
+      "maxLeverage": 10,
+      "stopLossRequired": true,
+      "takeProfitRequired": true
+    },
+    "monitoring": {
+      "logLevel": "INFO",
+      "saveStateInterval": 600000,
+      "alertThresholds": {
+        "failureRate": 0.2,
+        "responseTime": 5000
+      }
+    }
+  },
+  "uptime": 318218
+}
