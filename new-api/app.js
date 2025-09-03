@@ -5,7 +5,8 @@ const morgan = require('morgan');
 
 // Importar rotas
 const apiRoutes = require('./routes/api');
-const { rateLimiter } = require('./middleware/auth');
+const authRoutes = require('./routes/auth');
+const { rateLimiter, authMiddleware } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,7 +37,10 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Usar rotas da API
+// Rotas de autenticação (públicas)
+app.use('/api/auth', authRoutes);
+
+// Usar rotas da API (algumas protegidas)
 app.use('/api', apiRoutes);
 
 // Middleware de tratamento de erros
