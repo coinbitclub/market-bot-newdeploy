@@ -1,0 +1,346 @@
+// =============================================
+// 🗄️ PRISMA SCHEMA - MARKET BOT
+// Replica exata da estrutura de produção
+// =============================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================
+// 👥 MODEL: User
+// =============================================
+model User {
+  id       Int    @id @default(autoincrement())
+  username String @unique @db.VarChar(100)
+  email    String @unique @db.VarChar(255)
+  passwordHash String @map("password_hash") @db.VarChar(255)
+  
+  // Informações pessoais
+  fullName String? @map("full_name") @db.VarChar(255)
+  country  String? @default("BR") @db.VarChar(3)
+  
+  // Configurações de conta
+  accountType   String @default("testnet") @map("account_type") @db.VarChar(20)
+  planType      String @default("BASIC") @map("plan_type") @db.VarChar(20)
+  affiliateType String @default("none") @map("affiliate_type") @db.VarChar(20)
+  
+  // Saldos financeiros
+  balanceRealBrl       Decimal @default(0.00) @map("balance_real_brl") @db.Decimal(15, 2)
+  balanceRealUsd       Decimal @default(0.00) @map("balance_real_usd") @db.Decimal(15, 2)
+  balanceAdminBrl      Decimal @default(0.00) @map("balance_admin_brl") @db.Decimal(15, 2)
+  balanceAdminUsd      Decimal @default(0.00) @map("balance_admin_usd") @db.Decimal(15, 2)
+  balanceCommissionBrl Decimal @default(0.00) @map("balance_commission_brl") @db.Decimal(15, 2)
+  balanceCommissionUsd Decimal @default(0.00) @map("balance_commission_usd") @db.Decimal(15, 2)
+  
+  // Chaves API
+  binanceApiKey    String? @map("binance_api_key") @db.VarChar(255)
+  binanceSecretKey String? @map("binance_secret_key") @db.VarChar(255)
+  binanceTestnet   Boolean @default(true) @map("binance_testnet")
+  bybitApiKey      String? @map("bybit_api_key") @db.VarChar(255)
+  bybitSecretKey   String? @map("bybit_secret_key") @db.VarChar(255)
+  bybitTestnet     Boolean @default(true) @map("bybit_testnet")
+  
+  // Status e configurações
+  isActive       Boolean @default(true) @map("is_active")
+  isAdmin        Boolean @default(false) @map("is_admin")
+  tradingEnabled Boolean @default(false) @map("trading_enabled")
+  riskLevel      String  @default("medium") @map("risk_level") @db.VarChar(20)
+  
+  // Timestamps
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  lastLogin DateTime? @map("last_login")
+  
+  // Relacionamentos
+  orders             Order[]
+  apiKeys            ApiKey[]
+  transactions       Transaction[]
+  commissionRecords  CommissionRecord[]
+  affiliateRequests  AffiliateRequest[]
+  
+  @@map("users")
+}
+
+// =============================================
+// 📡 MODEL: Signal
+// =============================================
+model Signal {
+  id     Int    @id @default(autoincrement())
+  symbol String @db.VarChar(20)
+  side   String @db.VarChar(10) // 'buy' ou 'sell'
+  action String @db.VarChar(20) // 'open', 'close', 'update'
+  
+  // Dados do sinal
+  price      Decimal? @db.Decimal(15, 8)
+  quantity   Decimal? @db.Decimal(15, 8)
+  stopLoss   Decimal? @map("stop_loss") @db.Decimal(15, 8)
+  takeProfit Decimal? @map("take_profit") @db.Decimal(15, 8)
+  leverage   Int?     @default(1)
+  
+  // Dados TradingView
+  tradingviewAlertName String? @map("tradingview_alert_name") @db.VarChar(255)
+  timeframe            String? @db.VarChar(10)
+  exchange             String  @default("bybit") @db.VarChar(20)
+  
+  // Análise IA
+  processed     Boolean @default(false)
+  aiAnalysis    String? @map("ai_analysis") @db.Text
+  aiConfidence  Decimal? @map("ai_confidence") @db.Decimal(5, 2)
+  aiRiskScore   Decimal? @map("ai_risk_score") @db.Decimal(5, 2)
+  
+  // Origem e status
+  source String @default("tradingview") @db.VarChar(50)
+  status String @default("pending") @db.VarChar(20)
+  
+  // Timestamps
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  processedAt DateTime? @map("processed_at")
+  
+  // Relacionamentos
+  orders Order[]
+  
+  @@map("signals")
+}
+
+// =============================================
+// 📈 MODEL: Order
+// =============================================
+model Order {
+  id       Int @id @default(autoincrement())
+  userId   Int @map("user_id")
+  signalId Int? @map("signal_id")
+  
+  // Dados da ordem
+  exchange String @db.VarChar(20)
+  symbol   String @db.VarChar(20)
+  side     String @db.VarChar(10) // 'buy' ou 'sell'
+  type     String @db.VarChar(20) // 'market', 'limit', 'stop'
+  
+  // Quantidades e preços
+  quantity       Decimal  @db.Decimal(15, 8)
+  price          Decimal? @db.Decimal(15, 8)
+  filledQuantity Decimal  @default(0) @map("filled_quantity") @db.Decimal(15, 8)
+  avgFillPrice   Decimal? @map("avg_fill_price") @db.Decimal(15, 8)
+  
+  // Status e IDs
+  status           String  @default("pending") @db.VarChar(20)
+  exchangeOrderId  String? @map("exchange_order_id") @db.VarChar(100)
+  clientOrderId    String? @map("client_order_id") @db.VarChar(100)
+  
+  // Timestamps
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  filledAt  DateTime? @map("filled_at")
+  
+  // Relacionamentos
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  signal Signal? @relation(fields: [signalId], references: [id])
+  
+  @@map("orders")
+}
+
+// =============================================
+// 🔑 MODEL: ApiKey
+// =============================================
+model ApiKey {
+  id         Int    @id @default(autoincrement())
+  userId     Int    @map("user_id")
+  exchange   String @db.VarChar(20)
+  apiKey     String @map("api_key") @db.VarChar(500)
+  apiSecret  String @map("api_secret") @db.VarChar(500)
+  passphrase String? @db.VarChar(255)
+  
+  // Status e validação
+  isActive       Boolean @default(true) @map("is_active")
+  isValid        Boolean @default(false) @map("is_valid")
+  tradingEnabled Boolean @default(false) @map("trading_enabled")
+  testnet        Boolean @default(true)
+  
+  // Permissões (JSON)
+  permissions Json @default("{}")
+  
+  // Timestamps
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastValidated DateTime? @map("last_validated")
+  lastUsed      DateTime? @map("last_used")
+  
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("api_keys")
+}
+
+// =============================================
+// 💰 MODEL: Transaction
+// =============================================
+model Transaction {
+  id     Int    @id @default(autoincrement())
+  userId Int    @map("user_id")
+  type   String @db.VarChar(50) // 'STRIPE_RECHARGE', 'ADMIN_CREDIT', etc.
+  amount Decimal @db.Decimal(15, 2)
+  currency String @default("BRL") @db.VarChar(3)
+  status   String @default("PENDING") @db.VarChar(20)
+  
+  // Detalhes financeiros
+  commissionAmount Decimal? @map("commission_amount") @db.Decimal(15, 2)
+  netAmount        Decimal? @map("net_amount") @db.Decimal(15, 2)
+  planType         String?  @map("plan_type") @db.VarChar(20)
+  
+  // Metadados
+  description String? @db.Text
+  externalId  String? @map("external_id") @db.VarChar(255)
+  metadata    Json    @default("{}")
+  
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // Relacionamentos
+  user              User               @relation(fields: [userId], references: [id])
+  commissionRecords CommissionRecord[]
+  
+  @@map("transactions")
+}
+
+// =============================================
+// 💼 MODEL: CommissionRecord
+// =============================================
+model CommissionRecord {
+  id       Int     @id @default(autoincrement())
+  userId   Int     @map("user_id")
+  amount   Decimal @db.Decimal(15, 2)
+  currency String  @default("BRL") @db.VarChar(3)
+  type     String  @db.VarChar(50) // 'COMPANY_COMMISSION', 'AFFILIATE_COMMISSION'
+  
+  // Detalhes da comissão
+  planType             String? @map("plan_type") @db.VarChar(20)
+  commissionRate       Decimal? @map("commission_rate") @db.Decimal(5, 2)
+  sourceTransactionId  Int?    @map("source_transaction_id")
+  
+  // Metadados
+  description String? @db.Text
+  metadata    Json    @default("{}")
+  
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  // Relacionamentos
+  user              User         @relation(fields: [userId], references: [id])
+  sourceTransaction Transaction? @relation(fields: [sourceTransactionId], references: [id])
+  
+  @@map("commission_records")
+}
+
+// =============================================
+// 🤝 MODEL: AffiliateRequest
+// =============================================
+model AffiliateRequest {
+  id     Int    @id @default(autoincrement())
+  userId Int    @unique @map("user_id")
+  
+  // Dados da solicitação
+  fullName          String  @map("full_name") @db.VarChar(255)
+  document          String  @db.VarChar(50)
+  tradingExperience String? @map("trading_experience") @db.Text
+  termsAccepted     Boolean @default(false) @map("terms_accepted")
+  
+  // Status da solicitação
+  requestedLevel String @default("AFFILIATE_NORMAL") @map("requested_level") @db.VarChar(20)
+  status         String @default("PENDING") @db.VarChar(20)
+  reason         String? @db.Text
+  adminNotes     String? @map("admin_notes") @db.Text
+  
+  // Código de afiliado
+  affiliateCodeGenerated String? @map("affiliate_code_generated") @db.VarChar(20)
+  
+  // Auditoria
+  processedByAdminId Int?      @map("processed_by_admin_id")
+  approvedAt         DateTime? @map("approved_at")
+  approvedBy         String?   @map("approved_by") @db.VarChar(50)
+  
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("affiliate_requests")
+}
+
+// =============================================
+// 😱 MODEL: FearGreedIndex
+// =============================================
+model FearGreedIndex {
+  id                  Int    @id @default(autoincrement())
+  value               Int
+  valueClassification String @map("value_classification") @db.VarChar(50)
+  
+  // Dados adicionais
+  timestampUnix    BigInt? @map("timestamp_unix")
+  timeUntilUpdate  String? @map("time_until_update") @db.VarChar(50)
+  source           String  @default("alternative.me") @db.VarChar(50)
+  
+  // Dados de mercado complementares
+  marketCapTotal Decimal? @map("market_cap_total") @db.Decimal(20, 2)
+  volume24h      Decimal? @map("volume_24h") @db.Decimal(20, 2)
+  btcDominance   Decimal? @map("btc_dominance") @db.Decimal(5, 2)
+  
+  // Timestamps
+  collectedAt DateTime @default(now()) @map("collected_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  @@map("fear_greed_index")
+}
+
+// =============================================
+// 🏆 MODEL: Top100Coin
+// =============================================
+model Top100Coin {
+  id     Int    @id @default(autoincrement())
+  coinId String @unique @map("coin_id") @db.VarChar(100)
+  symbol String? @db.VarChar(20)
+  name   String? @db.VarChar(255)
+  
+  // Dados de preço
+  currentPrice   Decimal? @map("current_price") @db.Decimal(20, 8)
+  marketCap      BigInt?  @map("market_cap")
+  marketCapRank  Int?     @map("market_cap_rank")
+  totalVolume    BigInt?  @map("total_volume")
+  
+  // Variações de preço
+  priceChange24h           Decimal? @map("price_change_24h") @db.Decimal(20, 8)
+  priceChangePercentage24h Decimal? @map("price_change_percentage_24h") @db.Decimal(10, 4)
+  priceChangePercentage7d  Decimal? @map("price_change_percentage_7d") @db.Decimal(10, 4)
+  
+  // Supply
+  circulatingSupply Decimal? @map("circulating_supply") @db.Decimal(30, 2)
+  totalSupply       Decimal? @map("total_supply") @db.Decimal(30, 2)
+  maxSupply         Decimal? @map("max_supply") @db.Decimal(30, 2)
+  
+  // ATH/ATL
+  ath     Decimal?  @db.Decimal(20, 8)
+  athDate DateTime? @map("ath_date")
+  atl     Decimal?  @db.Decimal(20, 8)
+  atlDate DateTime? @map("atl_date")
+  
+  // Metadados
+  imageUrl String? @map("image_url") @db.Text
+  
+  // Timestamps
+  lastUpdated DateTime? @map("last_updated")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  @@map("top100_coins")
+}
