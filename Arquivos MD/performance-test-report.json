@@ -1,0 +1,269 @@
+{
+  "timestamp": "2025-09-05T01:14:22.955Z",
+  "systemMetrics": {
+    "uptime": 360,
+    "memoryUsage": null,
+    "eventLoopLag": null,
+    "httpRequests": 12163,
+    "activeConnections": 1,
+    "processUptime": 0.6924927
+  },
+  "endpointMetrics": {
+    "Health Check": {
+      "avgTime": 34.7,
+      "minTime": 25,
+      "maxTime": 46,
+      "successRate": 100,
+      "measurements": [
+        42,
+        36,
+        32,
+        46,
+        42,
+        36,
+        34,
+        29,
+        42,
+        39,
+        34,
+        25,
+        40,
+        38,
+        32,
+        30,
+        29,
+        26,
+        33,
+        29
+      ]
+    },
+    "Dashboard": {
+      "avgTime": 35.1,
+      "minTime": 25,
+      "maxTime": 52,
+      "successRate": 100,
+      "measurements": [
+        49,
+        33,
+        32,
+        32,
+        31,
+        37,
+        37,
+        29,
+        25,
+        37,
+        33,
+        32,
+        39,
+        37,
+        33,
+        52,
+        35,
+        32,
+        28,
+        39
+      ]
+    },
+    "Enterprise Status": {
+      "avgTime": 36.85,
+      "minTime": 27,
+      "maxTime": 47,
+      "successRate": 100,
+      "measurements": [
+        36,
+        39,
+        44,
+        33,
+        34,
+        36,
+        37,
+        34,
+        47,
+        27,
+        35,
+        28,
+        30,
+        43,
+        33,
+        42,
+        39,
+        39,
+        36,
+        45
+      ]
+    },
+    "Prometheus Metrics": {
+      "avgTime": 41.2,
+      "minTime": 20,
+      "maxTime": 124,
+      "successRate": 100,
+      "measurements": [
+        42,
+        43,
+        36,
+        44,
+        26,
+        37,
+        35,
+        39,
+        48,
+        57,
+        41,
+        37,
+        36,
+        36,
+        124,
+        20,
+        27,
+        40,
+        23,
+        33
+      ]
+    },
+    "Cache Stats": {
+      "avgTime": 3374.1,
+      "minTime": 265,
+      "maxTime": 5114,
+      "successRate": 100,
+      "measurements": [
+        656,
+        1373,
+        2131,
+        2932,
+        4174,
+        4579,
+        5082,
+        265,
+        5114,
+        1108,
+        5057,
+        2084,
+        5071,
+        2692,
+        5049,
+        3133,
+        5062,
+        3131,
+        5102,
+        3687
+      ]
+    },
+    "Database Stats": {
+      "avgTime": 33.65,
+      "minTime": 21,
+      "maxTime": 52,
+      "successRate": 100,
+      "measurements": [
+        52,
+        22,
+        29,
+        21,
+        28,
+        36,
+        30,
+        27,
+        36,
+        34,
+        36,
+        52,
+        36,
+        28,
+        23,
+        35,
+        36,
+        37,
+        38,
+        37
+      ]
+    },
+    "Trading Status": {
+      "avgTime": 34.85,
+      "minTime": 8,
+      "maxTime": 55,
+      "successRate": 100,
+      "measurements": [
+        36,
+        38,
+        44,
+        55,
+        8,
+        44,
+        37,
+        45,
+        29,
+        27,
+        27,
+        37,
+        36,
+        33,
+        29,
+        27,
+        23,
+        41,
+        39,
+        42
+      ]
+    },
+    "AI Rate Limiter": {
+      "avgTime": 39.75,
+      "minTime": 24,
+      "maxTime": 54,
+      "successRate": 100,
+      "measurements": [
+        41,
+        33,
+        36,
+        38,
+        46,
+        40,
+        36,
+        33,
+        35,
+        52,
+        54,
+        47,
+        41,
+        45,
+        24,
+        34,
+        31,
+        49,
+        40,
+        40
+      ]
+    }
+  },
+  "performanceScore": 83.84489583333333,
+  "recommendations": [
+    "⚡ Otimizar Cache Stats - tempo atual: 3374.10ms"
+  ],
+  "concurrencyResults": {
+    "5": {
+      "totalTime": 40,
+      "avgTimePerRequest": 8,
+      "success": true
+    },
+    "10": {
+      "totalTime": 63,
+      "avgTimePerRequest": 6.3,
+      "success": true
+    },
+    "25": {
+      "totalTime": 132,
+      "avgTimePerRequest": 5.28,
+      "success": true
+    },
+    "50": {
+      "totalTime": 187,
+      "avgTimePerRequest": 3.74,
+      "success": true
+    }
+  },
+  "memoryTest": {
+    "baseline": null,
+    "afterLoad": null,
+    "increase": null,
+    "leakDetected": false
+  }
+}

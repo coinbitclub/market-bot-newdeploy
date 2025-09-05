@@ -1,0 +1,293 @@
+{
+  "totalTests": 18,
+  "passedTests": 16,
+  "failedTests": 2,
+  "startTime": 1757033632766,
+  "tests": [
+    {
+      "name": "TESTE 1: Componentes Core",
+      "total": 5,
+      "passed": 4,
+      "failed": 1,
+      "successRate": "80.00%",
+      "details": [
+        {
+          "test": "Sistema Principal",
+          "status": "PASS",
+          "details": {
+            "system": "CoinBitClub Enterprise v6.0.0",
+            "status": "operational",
+            "description": "Sistema de trading automatizado empresarial",
+            "endpoints": {
+              "health": "/health",
+              "dashboard": "/dashboard",
+              "api": "/api/enterprise",
+              "login": "/login",
+              "checkout": "/checkout"
+            },
+            "features": [
+              "Autenticação multi-usuário",
+              "Processamento de pagamentos Stripe",
+              "Trading automatizado com IA",
+              "Sistema de afiliados",
+              "Análise de mercado em tempo real"
+            ],
+            "timestamp": "2025-09-05T00:53:52.815Z"
+          }
+        },
+        {
+          "test": "Health Check",
+          "status": "PASS",
+          "details": {
+            "status": "ok",
+            "system": "CoinBitClub Enterprise v6.0.0",
+            "timestamp": "2025-09-05T00:53:52.831Z",
+            "services": {
+              "trading": "operational",
+              "financial": "operational",
+              "authentication": "operational",
+              "affiliate": "operational"
+            }
+          }
+        },
+        {
+          "test": "Enterprise API",
+          "status": "PASS",
+          "details": {
+            "system": "CoinBitClub Enterprise",
+            "version": "6.0.0",
+            "status": "operational",
+            "timestamp": "2025-09-05T00:53:52.842Z",
+            "components": {
+              "trading": "active",
+              "financial": "active",
+              "cache": "active",
+              "database": "active",
+              "monitoring": "active"
+            },
+            "uptime": 95.2507912
+          }
+        },
+        {
+          "test": "Database Connection",
+          "status": "PASS",
+          "details": {
+            "master": {
+              "totalCount": 0,
+              "idleCount": 0,
+              "waitingCount": 0,
+              "healthy": false
+            },
+            "replicas": [],
+            "totalQueries": 0,
+            "readQueries": 0,
+            "writeQueries": 0,
+            "errors": 0,
+            "activeConnections": 0,
+            "distribution": {
+              "master": 0,
+              "replicas": 0
+            },
+            "loadBalance": "0%"
+          }
+        },
+        {
+          "test": "Cache Redis",
+          "status": "FAIL",
+          "error": "timeout of 5000ms exceeded"
+        }
+      ]
+    },
+    {
+      "name": "TESTE 2: Autenticação 2FA",
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "successRate": "100.00%",
+      "details": [
+        {
+          "test": "2FA Setup",
+          "status": "PASS",
+          "details": "QR Code gerado"
+        },
+        {
+          "test": "Backup Codes",
+          "status": "PASS",
+          "details": "5 códigos gerados"
+        },
+        {
+          "test": "SMS Code",
+          "status": "PASS",
+          "details": "SMS simulado enviado"
+        }
+      ]
+    },
+    {
+      "name": "TESTE 3: Sistema Financeiro",
+      "total": 3,
+      "passed": 2,
+      "failed": 1,
+      "successRate": "66.67%",
+      "details": [
+        {
+          "test": "Conversão USD/BRL",
+          "status": "PASS",
+          "details": {
+            "success": true,
+            "original_amount": 100,
+            "original_currency": "USD",
+            "converted_amount": "525.00",
+            "converted_currency": "BRL",
+            "exchange_rate": 5.25,
+            "timestamp": "2025-09-05T00:53:57.910Z"
+          }
+        },
+        {
+          "test": "Créditos Administrativos",
+          "status": "FAIL",
+          "error": "getaddrinfo ENOTFOUND base"
+        },
+        {
+          "test": "Tipos de Crédito",
+          "status": "PASS",
+          "details": "6 tipos disponíveis"
+        }
+      ]
+    },
+    {
+      "name": "TESTE 4: Trading System",
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "successRate": "100.00%",
+      "details": [
+        {
+          "test": "Trading Status",
+          "status": "PASS",
+          "details": {
+            "status": "active",
+            "activePositions": 0,
+            "totalTrades": 0,
+            "lastUpdate": "2025-09-05T00:54:00.841Z"
+          }
+        },
+        {
+          "test": "Cooldown Validation",
+          "status": "PASS",
+          "details": {
+            "success": true,
+            "cooldownActive": false,
+            "remainingTime": 0,
+            "canTrade": true
+          }
+        },
+        {
+          "test": "Max Positions Validation",
+          "status": "PASS",
+          "details": {
+            "success": true,
+            "currentPositions": 0,
+            "maxPositions": 2,
+            "canOpenPosition": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "TESTE 5: OpenAI Rate Limiting",
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "successRate": "100.00%",
+      "details": [
+        {
+          "test": "Rate Limiter Stats",
+          "status": "PASS",
+          "details": {
+            "calls_per_minute": 0,
+            "calls_per_hour": 0,
+            "cache_size": 0,
+            "failure_count": 0,
+            "is_fallback_mode": false,
+            "last_failure": null,
+            "limits": {
+              "callsPerMinute": 20,
+              "callsPerHour": 500,
+              "cacheDuration": 300000,
+              "fallbackThreshold": 3
+            },
+            "next_minute_reset": -41088,
+            "next_hour_reset": 3498912
+          }
+        },
+        {
+          "test": "Fallback System",
+          "status": "PASS",
+          "details": "Fallback ativado corretamente"
+        }
+      ]
+    },
+    {
+      "name": "TESTE 6: Monitoramento e Métricas",
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "successRate": "100.00%",
+      "details": [
+        {
+          "test": "Prometheus Metrics",
+          "status": "PASS",
+          "details": "Métricas disponíveis"
+        },
+        {
+          "test": "Structured Logs",
+          "status": "PASS",
+          "details": {
+            "logDirectory": "C:\\Nova pasta\\market-bot-newdeploy\\logs",
+            "logLevel": "info",
+            "logFormat": "json",
+            "files": {
+              "application.log": {
+                "size": "51.71 KB",
+                "modified": "2025-09-05T00:54:00.890Z",
+                "lines": 97
+              },
+              "enterprise-test-error-1756907219671.json": {
+                "size": "371 B",
+                "modified": "2025-09-03T13:46:59.674Z",
+                "lines": 4
+              },
+              "errors.log": {
+                "size": "2.04 KB",
+                "modified": "2025-09-05T00:52:09.890Z",
+                "lines": 4
+              },
+              "exceptions.log": {
+                "size": "0 B",
+                "modified": "2025-09-05T00:47:25.888Z",
+                "lines": 0
+              },
+              "rejections.log": {
+                "size": "0 B",
+                "modified": "2025-09-05T00:47:25.891Z",
+                "lines": 0
+              },
+              "security.log": {
+                "size": "2.04 KB",
+                "modified": "2025-09-05T00:52:09.890Z",
+                "lines": 4
+              },
+              "trading.log": {
+                "size": "51.71 KB",
+                "modified": "2025-09-05T00:54:00.890Z",
+                "lines": 97
+              }
+            },
+            "activeCorrelations": 0,
+            "activeMetrics": 1
+          }
+        }
+      ]
+    }
+  ]
+}
