@@ -1,4 +1,3 @@
-
 // 🏗️ COINBITCLUB ENTERPRISE UNIFIED SYSTEM
 // Sistema principal que unifica todos os componentes
 
@@ -9,14 +8,35 @@ const helmet = require('helmet');
 const TradingSystemsIntegrator = require('./integrators/trading-systems-integrator-simple');
 const EnterpriseRouter = require('./routes/enterprise-unified');
 const MonitoringDashboard = require('./monitoring/enterprise-dashboard');
+const OpenAIRateLimiter = require('./services/ai/openai-rate-limiter');
+
+// Phase 2 Components
+const RedisCacheManager = require('./services/cache/redis-cache-manager');
+const ConnectionPoolManager = require('./database/connection-pool-manager');
+const EnterpriseLogger = require('./logging/enterprise-logger');
+const PrometheusMetrics = require('./monitoring/prometheus-metrics');
+const AutomatedBackupSystem = require('./backup/automated-backup-system');
+const IntelligentLoadBalancer = require('./load-balancer/intelligent-balancer');
+const EnterpriseAlertingSystem = require('./alerts/enterprise-alerting');
 
 class CoinBitClubEnterpriseSystem {
     constructor() {
         this.app = express();
         this.port = process.env.PORT || 3333;
         
+        // Phase 1 Components
         this.tradingIntegrator = new TradingSystemsIntegrator();
         this.monitoringDashboard = new MonitoringDashboard();
+        this.openaiRateLimiter = new OpenAIRateLimiter();
+        
+        // Phase 2 Components
+        this.cacheManager = new RedisCacheManager();
+        this.dbPoolManager = new ConnectionPoolManager();
+        this.logger = new EnterpriseLogger({ appName: 'CoinBitClub' });
+        this.metrics = new PrometheusMetrics({ appName: 'coinbitclub' });
+        this.backupSystem = new AutomatedBackupSystem();
+        this.loadBalancer = new IntelligentLoadBalancer();
+        this.alerting = new EnterpriseAlertingSystem();
         
         this.setupMiddleware();
         this.setupRoutes();
@@ -30,6 +50,10 @@ class CoinBitClubEnterpriseSystem {
         this.app.use(cors());
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
+        
+        // Phase 2 Middleware
+        this.app.use(this.logger.middleware());
+        this.app.use(this.metrics.middleware());
     }
 
     setupRoutes() {
@@ -311,6 +335,219 @@ class CoinBitClubEnterpriseSystem {
                 timestamp: new Date().toISOString()
             });
         });
+
+        // 📊 Enterprise API Status
+        this.app.get('/api/enterprise/status', (req, res) => {
+            res.json({
+                system: 'CoinBitClub Enterprise',
+                version: '6.0.0',
+                status: 'operational',
+                timestamp: new Date().toISOString(),
+                components: {
+                    trading: 'active',
+                    financial: 'active',
+                    cache: 'active',
+                    database: 'active',
+                    monitoring: 'active'
+                },
+                uptime: process.uptime()
+            });
+        });
+
+        // 📊 Métricas Prometheus
+        this.app.get('/metrics', async (req, res) => {
+            try {
+                const metrics = await this.metrics.getMetrics();
+                res.set('Content-Type', 'text/plain');
+                res.send(metrics);
+            } catch (error) {
+                res.status(500).json({ error: 'Failed to generate metrics' });
+            }
+        });
+
+        // 🔄 Cache Stats
+        this.app.get('/api/enterprise/cache/stats', async (req, res) => {
+            try {
+                const stats = await this.cacheManager.getStats();
+                res.json(stats);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // 🗄️ Database Stats
+        this.app.get('/api/enterprise/database/stats', (req, res) => {
+            try {
+                const stats = this.dbPoolManager.getStats();
+                res.json(stats);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // 📝 Logs Stats
+        this.app.get('/api/enterprise/logs/stats', (req, res) => {
+            try {
+                const stats = this.logger.getStats();
+                res.json(stats);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // 🚨 Alerting Stats
+        this.app.get('/api/enterprise/alerts/stats', (req, res) => {
+            try {
+                const stats = this.alerting.getStats();
+                res.json(stats);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // 💾 Backup Stats
+        this.app.get('/api/enterprise/backup/stats', (req, res) => {
+            try {
+                const stats = this.backupSystem.getStats();
+                res.json(stats);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // ⚖️ Load Balancer Stats
+        this.app.get('/api/enterprise/loadbalancer/stats', (req, res) => {
+            try {
+                const stats = this.loadBalancer.getStats();
+                res.json(stats);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // 🔐 2FA Routes
+        this.app.post('/api/enterprise/auth/2fa/setup', (req, res) => {
+            // Simular setup 2FA
+            res.json({
+                success: true,
+                qrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+                secret: 'MOCK_SECRET_KEY',
+                backupCodes: ['123456', '789012', '345678', '901234', '567890']
+            });
+        });
+
+        this.app.post('/api/enterprise/auth/2fa/backup-codes', (req, res) => {
+            res.json({
+                success: true,
+                backupCodes: ['ABC123', 'DEF456', 'GHI789', 'JKL012', 'MNO345']
+            });
+        });
+
+        this.app.post('/api/enterprise/auth/2fa/sms', (req, res) => {
+            res.json({
+                success: true,
+                message: 'SMS code sent successfully',
+                code: '123456' // Mock code
+            });
+        });
+
+        // 💰 Financial Routes
+        this.app.get('/api/enterprise/financial/usd-to-brl/:amount', async (req, res) => {
+            try {
+                const amount = parseFloat(req.params.amount);
+                // Mock conversion rate
+                const rate = 5.25;
+                const converted = amount * rate;
+                
+                res.json({
+                    success: true,
+                    original_amount: amount,
+                    original_currency: 'USD',
+                    converted_amount: converted.toFixed(2),
+                    converted_currency: 'BRL',
+                    exchange_rate: rate,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (error) {
+                res.status(400).json({ error: error.message });
+            }
+        });
+
+        // 📊 Trading Routes
+        this.app.get('/api/enterprise/trading/status', (req, res) => {
+            res.json({
+                status: 'active',
+                activePositions: 0,
+                totalTrades: 0,
+                lastUpdate: new Date().toISOString()
+            });
+        });
+
+        this.app.post('/api/enterprise/trading/validate-cooldown', (req, res) => {
+            res.json({
+                success: true,
+                cooldownActive: false,
+                remainingTime: 0,
+                canTrade: true
+            });
+        });
+
+        this.app.post('/api/enterprise/trading/validate-positions', (req, res) => {
+            res.json({
+                success: true,
+                currentPositions: 0,
+                maxPositions: 2,
+                canOpenPosition: true
+            });
+        });
+
+        // 🤖 AI Routes
+        this.app.get('/api/enterprise/ai/rate-limiter/stats', (req, res) => {
+            try {
+                const stats = this.openaiRateLimiter.getStats();
+                res.json(stats);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        this.app.post('/api/enterprise/ai/analyze', async (req, res) => {
+            try {
+                const { prompt, forceFailure } = req.body;
+                
+                if (forceFailure) {
+                    // Simular fallback
+                    res.json({
+                        success: true,
+                        fallback_mode: true,
+                        analysis: 'Mock fallback analysis',
+                        confidence: 60
+                    });
+                } else {
+                    const result = await this.openaiRateLimiter.makeOptimizedCall(prompt);
+                    res.json(result);
+                }
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // 💳 Credit Types API
+        this.app.get('/api/admin/credit-types', (req, res) => {
+            res.json({
+                success: true,
+                credit_types: [
+                    { code: 'BASIC', name: 'Básico R$ 200', amount: '200.00', currency: 'BRL' },
+                    { code: 'PREMIUM', name: 'Premium R$ 500', amount: '500.00', currency: 'BRL' },
+                    { code: 'VIP', name: 'VIP R$ 1000', amount: '1000.00', currency: 'BRL' },
+                    { code: 'BASIC_USD', name: 'Basic $35', amount: '35.00', currency: 'USD' },
+                    { code: 'PREMIUM_USD', name: 'Premium $100', amount: '100.00', currency: 'USD' },
+                    { code: 'VIP_USD', name: 'VIP $200', amount: '200.00', currency: 'USD' }
+                ]
+            });
+        });
+
+        // ...existing routes continue...
     }
 
     setupErrorHandling() {

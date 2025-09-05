@@ -261,7 +261,28 @@ class RealTradingExecutor {
         };
 
         try {
-            // 1. BUSCAR CHAVES API DO USUÁRIO
+            // 1. VALIDAR COOLDOWN DE 120 MINUTOS (ESPECIFICAÇÃO)
+            const symbol = signalData.symbol || 'BTCUSDT';
+            const cooldownValid = await this.validateCooldown(user.id, symbol);
+            
+            if (!cooldownValid.valid) {
+                userResult.status = 'COOLDOWN_ACTIVE';
+                userResult.error_message = cooldownValid.message;
+                console.log(`  ⏱️ ${cooldownValid.message}`);
+                return userResult;
+            }
+
+            // 2. VALIDAR MÁXIMO 2 POSIÇÕES SIMULTÂNEAS
+            const positionsValid = await this.validateMaxPositions(user.id);
+            
+            if (!positionsValid.valid) {
+                userResult.status = 'MAX_POSITIONS';
+                userResult.error_message = positionsValid.message;
+                console.log(`  📊 ${positionsValid.message}`);
+                return userResult;
+            }
+
+            // 3. BUSCAR CHAVES API DO USUÁRIO
             const apiKeys = await this.getUserApiKeys(user.id);
             
             if (apiKeys.length === 0) {
@@ -273,118 +294,149 @@ class RealTradingExecutor {
 
             console.log(`  🔑 Chaves encontradas: ${apiKeys.length}`);
 
-            // 2. VALIDAR CONFIGURAÇÕES DE TRADING
+            // 4. VALIDAR CONFIGURAÇÕES DE TRADING
             const tradingConfig = this.validateUserTradingConfig(user, signalData);
-    }
-
-    validateUserTradingConfig(user, signalData) {
-        // 🚨 APLICAR CONFIGURAÇÕES OBRIGATÓRIAS DA ESPECIFICAÇÃO
-        const UniversalConfigEnforcer = require('../../src/utils/universal-config-enforcer.js');
-        const enforcer = new UniversalConfigEnforcer();
-        
-        try {
-            // Extrair dados do sinal ou aplicar defaults
-            const userPreferences = {
-                leverage: signalData.leverage || user.leverage,
-                stopLoss: signalData.stopLoss || user.stopLoss,
-                takeProfit: signalData.takeProfit || user.takeProfit,
-                positionSizePercent: signalData.positionSizePercent || user.positionSizePercent
-            };
-
-            // ⚠️ FORÇAR CONFIGURAÇÕES DA ESPECIFICAÇÃO
-            const enforcedConfig = enforcer.enforceSpecificationDefaults(userPreferences);
             
-            // Validar contra especificação
-            const validation = enforcer.validateAgainstSpecification(enforcedConfig);
-            
-            if (!validation.isValid) {
-                return {
-                    valid: false,
-                    reason: validation.errors.join('; '),
-                    enforcedConfig: validation.enforcedConfig
-                };
-            }
-
-            // Preparar parâmetros OBRIGATÓRIOS da ordem
-            const orderParams = {
-                symbol: signalData.symbol || 'BTCUSDT',
-                side: (signalData.action || signalData.signal || 'BUY').toUpperCase(),
-                amount: this.calculatePositionSize(enforcedConfig, user.balance),
-                type: 'MARKET',
-                leverage: enforcedConfig.leverage,
-                stopLoss: enforcedConfig.stopLoss,        // OBRIGATÓRIO
-                takeProfit: enforcedConfig.takeProfit,    // OBRIGATÓRIO
-                positionSize: enforcedConfig.positionSizePercent
-            };
-
-            return {
-                valid: true,
-                reason: 'Configuração aprovada com parâmetros obrigatórios da especificação',
-                orderParams: orderParams,
-                enforcedConfig: enforcedConfig
-            };
-
-        } catch (error) {
-            return {
-                valid: false,
-                reason: `Erro na validação obrigatória: ${error.message}`
-            };
-        }
-    }`);
+            if (!tradingConfig.valid) {
+                userResult.status = 'INVALID_CONFIG';
+                userResult.error_message = tradingConfig.reason;
+                console.log(`  ❌ ${tradingConfig.reason}`);
                 return userResult;
             }
 
-            console.log('  ✅ Configuração de trading válida');
-
-            // 3. EXECUTAR EM CADA EXCHANGE
-            let hasSuccessfulExecution = false;
-
-            for (const keyData of apiKeys) {
-                const exchangeKey = `${keyData.exchange}_${keyData.environment}`;
-                console.log(`    🔄 Executando em ${exchangeKey}...`);
-
-                try {
-                    const orderResult = await this.executeOrderOnExchange(
-                        keyData,
-                        signalData,
-                        tradingConfig.orderParams,
-                        signalId,
-                        user.id
-                    );
-
-                    userResult.exchange_results[exchangeKey] = orderResult;
-
-                    if (orderResult.success) {
-                        console.log(`      ✅ SUCESSO - Order ID: ${orderResult.order_id}`);
-                        userResult.orders_executed++;
-                        hasSuccessfulExecution = true;
-                    } else {
-                        console.log(`      ❌ FALHA - ${orderResult.error}`);
-                    }
-
-                } catch (error) {
-                    console.log(`      ❌ ERRO - ${error.message}`);
-                    userResult.exchange_results[exchangeKey] = {
-                        success: false,
-                        error: error.message,
-                        timestamp: new Date().toISOString()
-                    };
-                }
-
-                // Rate limiting entre exchanges
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-
-            // 4. DETERMINAR STATUS FINAL
-            userResult.status = hasSuccessfulExecution ? 'SUCCESS' : 'FAILED';
-
+            console.log('  ✅ Todas as validações passaram - executando trades...');
+            
+            // 5. EXECUTAR TRADES
+            return await this.executeTradeForUser(user, signalData, signalId);
+            
         } catch (error) {
-            console.error(`  ❌ Erro geral para usuário ${user.username}:`, error.message);
+            console.error(`  ❌ Erro para usuário ${user.username}:`, error.message);
             userResult.status = 'ERROR';
             userResult.error_message = error.message;
+            return userResult;
         }
+    }
 
-        return userResult;
+    /**
+     * ⏱️ VALIDAR COOLDOWN DE 120 MINUTOS POR MOEDA (ESPECIFICAÇÃO)
+     */
+    async validateCooldown(userId, symbol) {
+        try {
+            const result = await this.pool.query(`
+                SELECT 
+                    MAX(executed_at) as last_execution,
+                    symbol,
+                    status
+                FROM trading_executions 
+                WHERE user_id = $1 
+                AND symbol = $2 
+                AND status IN ('SUCCESS', 'FILLED', 'COMPLETED')
+                AND executed_at > NOW() - INTERVAL '2 hours'
+                GROUP BY symbol, status
+                ORDER BY last_execution DESC
+                LIMIT 1
+            `, [userId, symbol]);
+
+            if (result.rows.length === 0) {
+                return { valid: true, message: 'Nenhuma operação recente encontrada' };
+            }
+
+            const lastExecution = new Date(result.rows[0].last_execution);
+            const now = new Date();
+            const minutesSinceLastTrade = Math.floor((now - lastExecution) / (1000 * 60));
+
+            if (minutesSinceLastTrade < 120) {
+                const remainingMinutes = 120 - minutesSinceLastTrade;
+                return {
+                    valid: false,
+                    message: `Cooldown ativo para ${symbol}: ${remainingMinutes} minutos restantes`,
+                    remaining_minutes: remainingMinutes,
+                    last_execution: lastExecution
+                };
+            }
+
+            return { 
+                valid: true, 
+                message: `Cooldown expirado - ${minutesSinceLastTrade} minutos desde última operação` 
+            };
+
+        } catch (error) {
+            console.error('❌ Erro ao validar cooldown:', error.message);
+            // Em caso de erro, permitir operação para não bloquear sistema
+            return { valid: true, message: 'Erro na validação - permitindo operação' };
+        }
+    }
+
+    /**
+     * 📊 VALIDAR MÁXIMO 2 POSIÇÕES SIMULTÂNEAS (ESPECIFICAÇÃO)
+     */
+    async validateMaxPositions(userId) {
+        try {
+            const result = await this.pool.query(`
+                SELECT COUNT(DISTINCT symbol) as active_positions
+                FROM trading_executions te
+                WHERE te.user_id = $1
+                AND te.status IN ('SUCCESS', 'FILLED', 'OPEN')
+                AND NOT EXISTS (
+                    SELECT 1 FROM trading_executions te_close
+                    WHERE te_close.user_id = te.user_id
+                    AND te_close.symbol = te.symbol
+                    AND te_close.side != te.side
+                    AND te_close.executed_at > te.executed_at
+                    AND te_close.status IN ('SUCCESS', 'FILLED', 'CLOSED')
+                )
+            `, [userId]);
+
+            const activePositions = parseInt(result.rows[0]?.active_positions || 0);
+
+            if (activePositions >= 2) {
+                return {
+                    valid: false,
+                    message: `Máximo de 2 posições simultâneas atingido (${activePositions} ativas)`,
+                    active_positions: activePositions
+                };
+            }
+
+            return {
+                valid: true,
+                message: `Posições ativas: ${activePositions}/2`,
+                active_positions: activePositions
+            };
+
+        } catch (error) {
+            console.error('❌ Erro ao validar posições máximas:', error.message);
+            // Em caso de erro, permitir operação
+            return { valid: true, message: 'Erro na validação - permitindo operação' };
+        }
+    }
+
+    /**
+     * 📏 CALCULAR TAMANHO DA POSIÇÃO CONFORME ESPECIFICAÇÃO
+     */
+    calculatePositionSize(config, userBalance) {
+        try {
+            // Aplicar configuração de % do saldo (default 30%)
+            const positionSizePercent = config.positionSizePercent || 0.30;
+            const leverage = config.leverage || 5;
+            
+            // Calcular tamanho baseado no saldo disponível
+            const baseAmount = (userBalance || 1000) * positionSizePercent;
+            const leveragedAmount = baseAmount * leverage;
+            
+            // Converter para quantidade baseada no preço estimado
+            const estimatedPrice = 50000; // BTC price estimate
+            const quantity = leveragedAmount / estimatedPrice;
+            
+            // Mínimo e máximo permitidos
+            const minQuantity = 0.001; // Mínimo exchange
+            const maxQuantity = userBalance * 0.5 / estimatedPrice; // Máximo 50% do saldo
+            
+            return Math.max(minQuantity, Math.min(quantity, maxQuantity));
+            
+        } catch (error) {
+            console.error('❌ Erro no cálculo de posição:', error.message);
+            return 0.001; // Quantidade mínima de segurança
+        }
     }
 
     /**
@@ -444,49 +496,87 @@ class RealTradingExecutor {
                 reason: `Erro na validação obrigatória: ${error.message}`
             };
         }
-    }x excede o máximo permitido (${maxLeverage}x)`
-                };
+    }
+
+    async executeTradeForUser(user, signalData, signalId) {
+        const userResult = {
+            username: user.username,
+            successful_executions: 0,
+            failed_executions: 0,
+            orders: []
+        };
+
+        try {
+            // 1. OBTER CHAVES API DO USUÁRIO
+            console.log(`  👤 Processando usuário: ${user.username}`);
+            const apiKeys = await this.getUserApiKeys(user.user_id);
+            
+            if (!apiKeys || apiKeys.length === 0) {
+                console.log('  ⚠️ Nenhuma chave API válida encontrada');
+                return userResult;
             }
 
-            // Verificar se stop loss é obrigatório
-            if (this.tradingConfig.mandatory_stop_loss && !stopLoss) {
-                return {
-                    valid: false,
-                    reason: 'Stop Loss é obrigatório para este usuário'
-                };
+            console.log(`  🔑 Chaves encontradas: ${apiKeys.length}`);
+
+            // 2. VALIDAR CONFIGURAÇÕES DE TRADING
+            const tradingConfig = this.validateUserTradingConfig(user, signalData);
+            
+            if (!tradingConfig.valid) {
+                console.log(`  ❌ Configuração inválida: ${tradingConfig.reason}`);
+                return userResult;
             }
 
-            // Validar tamanho da posição
-            const positionValue = quantity * (signalData.price || 50000); // Estimativa
-            if (positionValue > this.tradingConfig.max_position_size) {
-                return {
-                    valid: false,
-                    reason: `Valor da posição ($${positionValue}) excede o máximo permitido`
-                };
+            console.log('  ✅ Configuração de trading válida');
+
+            // 3. EXECUTAR EM CADA EXCHANGE
+            let hasSuccessfulExecution = false;
+
+            for (const keyData of apiKeys) {
+                const exchangeKey = `${keyData.exchange}_${keyData.environment}`;
+                console.log(`    🔄 Executando em ${exchangeKey}...`);
+
+                try {
+                    const orderResult = await this.executeOrderOnExchange(
+                        keyData,
+                        signalData,
+                        tradingConfig.orderParams,
+                        signalId,
+                        user.id
+                    );
+
+                    userResult.exchange_results[exchangeKey] = orderResult;
+
+                    if (orderResult.success) {
+                        console.log(`      ✅ SUCESSO - Order ID: ${orderResult.order_id}`);
+                        userResult.orders_executed++;
+                        hasSuccessfulExecution = true;
+                    } else {
+                        console.log(`      ❌ FALHA - ${orderResult.error}`);
+                    }
+
+                } catch (error) {
+                    console.log(`      ❌ ERRO - ${error.message}`);
+                    userResult.exchange_results[exchangeKey] = {
+                        success: false,
+                        error: error.message,
+                        timestamp: new Date().toISOString()
+                    };
+                }
+
+                // Rate limiting entre exchanges
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
 
-            // Preparar parâmetros da ordem
-            const orderParams = {
-                symbol: signalData.symbol || 'BTCUSDT',
-                side: (signalData.action || signalData.signal || 'BUY').toUpperCase(),
-                amount: quantity,
-                type: 'MARKET',
-                leverage: leverage,
-                stopLoss: stopLoss,
-                takeProfit: signalData.takeProfit || null
-            };
-
-            return {
-                valid: true,
-                orderParams: orderParams
-            };
+            // 4. DETERMINAR STATUS FINAL
+            userResult.status = hasSuccessfulExecution ? 'SUCCESS' : 'FAILED';
 
         } catch (error) {
-            return {
-                valid: false,
-                reason: `Erro na validação: ${error.message}`
-            };
+            console.error(`  ❌ Erro geral para usuário ${user.username}:`, error.message);
+            userResult.status = 'ERROR';
+            userResult.error_message = error.message;
         }
+
+        return userResult;
     }
 
     /**
