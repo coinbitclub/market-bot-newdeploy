@@ -49,7 +49,7 @@
     "scale:up": "docker service scale coinbitclub-enterprise_app=16",
     "scale:down": "docker service scale coinbitclub-enterprise_app=4",
     "health:check": "curl -f http://localhost:3333/health",
-    "start:production": "NODE_ENV=production node enterprise-orchestrator.js",
+    "start:production": "powershell -Command \"$env:NODE_ENV='production'; node enterprise-orchestrator.js\"",
     "backup:create": "powershell -ExecutionPolicy Bypass -File scripts/backup/backup-enterprise.ps1",
     "metrics": "curl http://localhost:3333/metrics"
   },

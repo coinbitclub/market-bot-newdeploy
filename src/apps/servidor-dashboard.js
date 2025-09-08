@@ -8,7 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const path = require('path');
-const { CONFIG, validateConfig } = require('./config');
+const { CONFIG, validateConfig } = require('../../config/config');
 
 // Validar configurações antes de iniciar
 validateConfig();

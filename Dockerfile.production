@@ -1,0 +1,112 @@
+# 🇱🇹 DOCKERFILE OTIMIZADO PARA PRODUÇÃO HOSTINGER
+# ============================================================================
+# Multi-stage build para otimizar tamanho e performance
+# Target: VPS Lituânia 32GB RAM / 8 vCPU
+# ============================================================================
+
+# Stage 1: Build Dependencies
+FROM node:18-alpine AS dependencies
+WORKDIR /app
+
+# Instalar dependências de sistema necessárias
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    curl \
+    libc6-compat \
+    && rm -rf /var/cache/apk/*
+
+# Copiar package files
+COPY package*.json ./
+
+# Instalar dependências com cache otimizado
+RUN npm ci --only=production \
+    && npm cache clean --force \
+    && rm -rf /tmp/*
+
+# Stage 2: Application Build
+FROM node:18-alpine AS builder
+WORKDIR /app
+
+# Copiar dependências da etapa anterior
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY . .
+
+# Remover arquivos desnecessários para produção
+RUN rm -rf \
+    tests/ \
+    docs/ \
+    *.md \
+    .git/ \
+    .github/ \
+    tools/development/ \
+    legacy/old-versions/ \
+    && find . -name "*.test.js" -delete \
+    && find . -name "*.spec.js" -delete
+
+# Stage 3: Production Runtime
+FROM node:18-alpine AS production
+
+# Metadados da imagem
+LABEL maintainer="CoinBitClub Team <admin@coinbitclub.com>"
+LABEL version="6.0.0"
+LABEL description="CoinBitClub Enterprise Trading Platform"
+LABEL environment="production"
+LABEL vps="hostinger-lithuania"
+
+# Variáveis de ambiente otimizadas
+ENV NODE_ENV=production
+ENV TZ=Europe/Vilnius
+ENV PORT=3000
+ENV NODE_OPTIONS="--max-old-space-size=4096 --enable-source-maps"
+ENV UV_THREADPOOL_SIZE=16
+
+# Instalar apenas dependências runtime essenciais
+RUN apk add --no-cache \
+    curl \
+    ca-certificates \
+    tzdata \
+    dumb-init \
+    && update-ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+# Criar usuário não-root para segurança
+RUN addgroup -g 1001 -S nodejs \
+    && adduser -S nodejs -u 1001
+
+# Criar diretórios necessários
+RUN mkdir -p /app/logs /app/backups /app/temp \
+    && chown -R nodejs:nodejs /app
+
+WORKDIR /app
+
+# Copiar aplicação construída
+COPY --from=builder --chown=nodejs:nodejs /app .
+
+# Criar script de inicialização
+RUN echo '#!/bin/sh' > /app/start.sh \
+    && echo 'echo "🚀 Iniciando CoinBitClub Enterprise v6.0.0"' >> /app/start.sh \
+    && echo 'echo "📍 Servidor: Hostinger Lituânia"' >> /app/start.sh \
+    && echo 'echo "🕒 Timezone: $TZ"' >> /app/start.sh \
+    && echo 'echo "💾 Memória disponível: $(free -h | awk "NR==2{print \$7}")"' >> /app/start.sh \
+    && echo 'echo "⚡ Iniciando aplicação na porta $PORT..."' >> /app/start.sh \
+    && echo 'exec node enterprise-orchestrator.js' >> /app/start.sh \
+    && chmod +x /app/start.sh \
+    && chown nodejs:nodejs /app/start.sh
+
+# Mudar para usuário não-root
+USER nodejs
+
+# Configurar health check otimizado
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:$PORT/api/enterprise/status || exit 1
+
+# Expor porta da aplicação
+EXPOSE 3000
+
+# Ponto de entrada com dumb-init para tratamento de sinais
+ENTRYPOINT ["dumb-init", "--"]
+
+# Comando de inicialização
+CMD ["/app/start.sh"]

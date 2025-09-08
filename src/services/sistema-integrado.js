@@ -7,7 +7,7 @@
  * - Monitoramento integrado
  */
 
-const { CONFIG, validateConfig } = require('./config');
+const { CONFIG, validateConfig } = require('../../config/config');
 const { exec, spawn } = require('child_process');
 const path = require('path');
 
@@ -81,7 +81,7 @@ class SistemaIntegrado {
 
     async iniciarSistemaLeitura() {
         return new Promise((resolve, reject) => {
-            const sistemaPath = path.join(__dirname, 'sistema-leitura-mercado-completo.js');
+            const sistemaPath = path.join(__dirname, '../../scripts/system/sistema-leitura-mercado-completo.js');
             
             this.sistemaLeitura = spawn('node', [sistemaPath], {
                 stdio: ['ignore', 'pipe', 'pipe'],
@@ -116,7 +116,7 @@ class SistemaIntegrado {
 
     async iniciarServidorDashboard() {
         return new Promise((resolve, reject) => {
-            const servidorPath = path.join(__dirname, 'servidor-dashboard.js');
+            const servidorPath = path.join(__dirname, '../apps/servidor-dashboard.js');
             
             this.servidorDashboard = spawn('node', [servidorPath], {
                 stdio: ['ignore', 'pipe', 'pipe'],
