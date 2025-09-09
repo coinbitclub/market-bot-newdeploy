@@ -1,5 +1,6 @@
 // 🏗️ COINBITCLUB ENTERPRISE UNIFIED SYSTEM
 // Sistema principal que unifica todos os componentes
+require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
