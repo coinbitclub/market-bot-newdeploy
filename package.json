@@ -1,7 +1,7 @@
 {
   "name": "coinbitclub-market-bot",
   "version": "6.0.0",
-  "description": "Sistema de Trading Automatizado CoinBitClub - Enterprise - CERTIFICADO PARA PRODUÇÃO",
+  "description": "CoinBitClub Enterprise Trading Platform v6.0.0 - Full Database Integration",
   "main": "src/enterprise-unified-system.js",
   "scripts": {
     "start": "node src/enterprise-unified-system.js",
@@ -20,7 +20,7 @@
     "ip-fix": "node start.js",
     "start:enterprise-unified": "node enterprise-orchestrator.js",
     "consolidate:enterprise": "node enterprise-consolidation-executor.js",
-    "start:enterprise": "node src/services/api/app.js",
+    "start:enterprise": "node src/enterprise-unified-system.js",
     "start:integrated": "node src/services/sistema-integrado.js",
     "start:phase3": "node implementations/phase3/scalability-phase3-enterprise.js",
     "start:orchestrated": "node implementations/phase3/scalability-phase3-enterprise.js",
@@ -51,7 +51,17 @@
     "health:check": "curl -f http://localhost:3333/health",
     "start:production": "powershell -Command \"$env:NODE_ENV='production'; node enterprise-orchestrator.js\"",
     "backup:create": "powershell -ExecutionPolicy Bypass -File scripts/backup/backup-enterprise.ps1",
-    "metrics": "curl http://localhost:3333/metrics"
+    "metrics": "curl http://localhost:3333/metrics",
+    "db:setup": "node scripts/database-setup.js",
+    "db:migrate": "node migrate-to-enterprise.js",
+    "test:db": "node scripts/test-database-connection.js",
+    "db:install": "psql -U coinbitclub_user -d coinbitclub_enterprise -f scripts/database/enterprise-complete-database-setup.sql",
+    "db:verify": "psql -U coinbitclub_user -d coinbitclub_enterprise -c \"SELECT COUNT(*) as total_tables FROM information_schema.tables WHERE table_schema = 'public';\"",
+    "db:admin": "psql -U coinbitclub_user -d coinbitclub_enterprise -c \"SELECT username, email FROM users WHERE username = 'admin';\"",
+    "db:backup": "pg_dump -U coinbitclub_user -d coinbitclub_enterprise > backup_$(date +%Y%m%d_%H%M%S).sql",
+    "setup:database:bash": "bash setup-database.sh",
+    "setup:database:powershell": "powershell -ExecutionPolicy Bypass -File setup-database.ps1",
+    "setup:database": "powershell -ExecutionPolicy Bypass -File setup-database.ps1"
   },
   "dependencies": {
     "aws-sdk": "^2.1692.0",
@@ -94,5 +104,19 @@
     "binance"
   ],
   "author": "CoinBitClub",
-  "license": "Private"
+  "license": "Private",
+  "enterprise": {
+    "version": "6.0.0",
+    "migration_date": "2025-09-09T20:19:02.872Z",
+    "database_integration": true,
+    "controllers": "enterprise",
+    "features": [
+      "postgresql_integration",
+      "stripe_webhooks",
+      "ai_trading_signals",
+      "affiliate_system",
+      "multi_currency_support",
+      "real_time_analytics"
+    ]
+  }
 }
