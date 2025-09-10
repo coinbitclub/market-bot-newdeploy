@@ -1,0 +1,62 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "CoinBitClub Enterprise API",
+    "version": "6.0.0",
+    "description": "API completa do sistema de trading CoinBitClub Enterprise",
+    "contact": {
+      "name": "CoinBitClub Enterprise Team",
+      "email": "dev@coinbitclub.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3333",
+      "description": "Servidor de desenvolvimento"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Mensagem de erro"
+          },
+          "code": {
+            "type": "string",
+            "description": "Código do erro"
+          }
+        }
+      },
+      "HealthCheck": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Status de saúde do sistema"
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp da verificação"
+          },
+          "version": {
+            "type": "string",
+            "description": "Versão do sistema"
+          }
+        }
+      }
+    }
+  },
+  "paths": {},
+  "tags": []
+}

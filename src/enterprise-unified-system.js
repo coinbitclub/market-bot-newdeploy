@@ -3,8 +3,14 @@
 require('dotenv').config();
 
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
+
+// T1 - Configurações padronizadas
+const corsConfig = require('./bootstrap/cors');
+const openApiConfig = require('./bootstrap/openapi');
+
+// T3 - WebSocket Server
+const websocketServer = require('./bootstrap/websocket');
 
 const TradingSystemsIntegrator = require('./integrators/trading-systems-integrator-simple');
 const EnterpriseRouter = require('./routes/enterprise-unified');
@@ -48,13 +54,19 @@ class CoinBitClubEnterpriseSystem {
 
     setupMiddleware() {
         this.app.use(helmet());
-        this.app.use(cors());
+        
+        // T1 - CORS restritivo
+        this.app.use(corsConfig.getMiddleware());
+        
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
         
         // Phase 2 Middleware
         this.app.use(this.logger.middleware());
         this.app.use(this.metrics.middleware());
+        
+        // T1 - Swagger UI
+        this.app.use('/docs', openApiConfig.getSwaggerUiServe(), openApiConfig.getSwaggerUiMiddleware());
     }
 
     setupRoutes() {
@@ -82,18 +94,27 @@ class CoinBitClubEnterpriseSystem {
             });
         });
 
-        // 🔍 Health check
+        /**
+         * @swagger
+         * /health:
+         *   get:
+         *     summary: Health check do sistema
+         *     description: Verifica se o sistema está operacional
+         *     tags: [System]
+         *     responses:
+         *       200:
+         *         description: Sistema operacional
+         *         content:
+         *           application/json:
+         *             schema:
+         *               $ref: '#/components/schemas/HealthCheck'
+         */
         this.app.get('/health', (req, res) => {
             res.json({ 
-                status: 'ok', 
-                system: 'CoinBitClub Enterprise v6.0.0',
-                timestamp: new Date().toISOString(),
-                services: {
-                    trading: 'operational',
-                    financial: 'operational',
-                    authentication: 'operational',
-                    affiliate: 'operational'
-                }
+                ok: true,
+                ts: new Date().toISOString(),
+                version: '6.0.0',
+                system: 'CoinBitClub Enterprise'
             });
         });
 
@@ -570,6 +591,10 @@ class CoinBitClubEnterpriseSystem {
                 console.log(`📊 Dashboard: http://localhost:${this.port}/dashboard`);
                 console.log(`⚡ API: http://localhost:${this.port}/api/enterprise`);
                 console.log(`🔄 Health: http://localhost:${this.port}/health`);
+                
+                // T3 - Inicializar WebSocket Server
+                websocketServer.initialize(this.server);
+                console.log(`🔌 WebSocket: ws://localhost:${this.port}/realtime`);
             });
             
             return this.server;

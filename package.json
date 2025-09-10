@@ -23,7 +23,12 @@
     "start:enterprise": "node src/enterprise-unified-system.js",
     "start:integrated": "node src/services/sistema-integrado.js",
     "start:phase3": "node implementations/phase3/scalability-phase3-enterprise.js",
+    "openapi:export": "node scripts/export-openapi.js",
     "start:orchestrated": "node implementations/phase3/scalability-phase3-enterprise.js",
+    "dev:backend": "cross-env NODE_ENV=development nodemon src/enterprise-unified-system.js",
+    "dev:watch": "cross-env NODE_ENV=development nodemon --watch src --ext js,json src/enterprise-unified-system.js",
+    "dev:full": "concurrently \"npm run dev:backend\" \"cd ../frontend-premium && npm run dev\"",
+    "dev:integrated": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"blue,green\" \"npm run dev:backend\" \"cd ../frontend-premium && npm run dev\"",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
     "test:load": "node tests/load/load-test-1000-users.js",
@@ -118,5 +123,12 @@
       "multi_currency_support",
       "real_time_analytics"
     ]
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.0.0",
+    "nodemon": "^3.1.10",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   }
 }
