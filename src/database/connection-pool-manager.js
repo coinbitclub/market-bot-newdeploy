@@ -85,9 +85,6 @@ class ConnectionPoolManager extends EventEmitter {
             // Testar conexões iniciais
             await this.testConnections();
             
-            // Iniciar health checks
-            this.startHealthChecks();
-            
             console.log('✅ Todos os pools de conexão inicializados');
 
         } catch (error) {
@@ -323,7 +320,8 @@ class ConnectionPoolManager extends EventEmitter {
                 console.error('🚨 ALERTA: Master database indisponível!');
             }
             
-            if (healthyReplicas === 0 && this.pools.replicas.length > 0) {
+            // Only show replica alerts in production
+            if (healthyReplicas === 0 && this.pools.replicas.length > 0 && process.env.NODE_ENV === 'production') {
                 this.emit('allReplicasDown');
                 console.error('🚨 ALERTA: Todas as réplicas indisponíveis!');
             }

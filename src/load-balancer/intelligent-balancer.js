@@ -42,7 +42,6 @@ class IntelligentLoadBalancer {
         };
 
         this.setupServers();
-        this.startHealthChecks();
         this.startSessionCleanup();
 
         console.log('⚖️ Intelligent Load Balancer inicializado');
@@ -412,6 +411,12 @@ class IntelligentLoadBalancer {
      * 🏥 Iniciar health checks periódicos
      */
     startHealthChecks() {
+        // Skip health checks in development if no real servers are configured
+        if (this.servers.length === 0 || this.servers.every(server => server.host === 'localhost' && server.port === 3333)) {
+            console.log('🏥 Health checks desabilitados para desenvolvimento local');
+            return;
+        }
+
         setInterval(async () => {
             console.log('🏥 Iniciando health checks...');
             
