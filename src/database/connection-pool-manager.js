@@ -62,9 +62,17 @@ class ConnectionPoolManager extends EventEmitter {
                                 process.env.DB_URL;
         
         if (connectionString) {
+            // Auto-detect if SSL is needed based on connection string or environment
+            const needsSSL = process.env.NODE_ENV === 'production' || 
+                           connectionString.includes('sslmode=require') ||
+                           connectionString.includes('railway.app') ||
+                           connectionString.includes('render.com') ||
+                           connectionString.includes('supabase.co') ||
+                           connectionString.includes('heroku.com');
+            
             return {
                 connectionString,
-                ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+                ssl: needsSSL ? { rejectUnauthorized: false } : false,
                 max: parseInt(process.env.DB_POOL_MAX) || 20,
                 min: parseInt(process.env.DB_POOL_MIN) || 5,
                 idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT) || 30000,
@@ -95,6 +103,14 @@ class ConnectionPoolManager extends EventEmitter {
             return null;
         }
 
+        // Auto-detect if SSL is needed based on host or environment
+        const needsSSL = process.env.NODE_ENV === 'production' || 
+                       host.includes('railway.app') ||
+                       host.includes('render.com') ||
+                       host.includes('supabase.co') ||
+                       host.includes('heroku.com') ||
+                       process.env.DB_SSL === 'true';
+
         return {
             host,
             port: parseInt(port),
@@ -105,7 +121,7 @@ class ConnectionPoolManager extends EventEmitter {
             min: parseInt(process.env.DB_POOL_MIN) || 5,
             idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT) || 30000,
             connectionTimeoutMillis: 10000,
-            ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+            ssl: needsSSL ? { rejectUnauthorized: false } : false
         };
     }
 
