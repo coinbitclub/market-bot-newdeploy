@@ -17,18 +17,7 @@ class ConnectionPoolManager extends EventEmitter {
         super();
         
         this.config = {
-            master: {
-                host: process.env.DB_MASTER_HOST || 'localhost',
-                port: process.env.DB_MASTER_PORT || 5432,
-                database: process.env.POSTGRES_DB || 'trading',
-                user: process.env.POSTGRES_USER || 'postgres',
-                password: process.env.POSTGRES_PASSWORD,
-                max: parseInt(process.env.DB_POOL_MAX) || 20,
-                min: parseInt(process.env.DB_POOL_MIN) || 5,
-                idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT) || 30000,
-                connectionTimeoutMillis: 10000,
-                ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-            },
+            master: this.getMasterConfig(),
             replicas: this.parseReplicas(),
             healthCheckInterval: parseInt(process.env.DB_REPLICA_HEALTH_CHECK_INTERVAL) || 15000,
             ...config
@@ -64,10 +53,75 @@ class ConnectionPoolManager extends EventEmitter {
     }
 
     /**
+     * Get master database configuration with proper fallbacks for deployment
+     */
+    getMasterConfig() {
+        // Try DATABASE_URL first (most common in deployment)
+        const connectionString = process.env.DATABASE_URL || 
+                                process.env.POSTGRES_URL || 
+                                process.env.DB_URL;
+        
+        if (connectionString) {
+            return {
+                connectionString,
+                ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+                max: parseInt(process.env.DB_POOL_MAX) || 20,
+                min: parseInt(process.env.DB_POOL_MIN) || 5,
+                idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT) || 30000,
+                connectionTimeoutMillis: 10000
+            };
+        }
+
+        // Try individual environment variables
+        const host = process.env.DB_MASTER_HOST || 
+                    process.env.DB_HOST || 
+                    process.env.POSTGRES_HOST;
+        const port = process.env.DB_MASTER_PORT || 
+                    process.env.DB_PORT || 
+                    process.env.POSTGRES_PORT || 
+                    5432;
+        const database = process.env.POSTGRES_DB || 
+                        process.env.DB_NAME || 
+                        'trading';
+        const user = process.env.POSTGRES_USER || 
+                    process.env.DB_USER || 
+                    'postgres';
+        const password = process.env.POSTGRES_PASSWORD || 
+                        process.env.DB_PASSWORD;
+
+        // If no password is provided, return null to trigger mock mode
+        if (!password) {
+            console.log('⚠️ No database password provided, will use mock mode');
+            return null;
+        }
+
+        return {
+            host,
+            port: parseInt(port),
+            database,
+            user,
+            password,
+            max: parseInt(process.env.DB_POOL_MAX) || 20,
+            min: parseInt(process.env.DB_POOL_MIN) || 5,
+            idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT) || 30000,
+            connectionTimeoutMillis: 10000,
+            ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+        };
+    }
+
+    /**
      * 🔧 Inicializar pools de conexão
      */
     async initialize() {
         try {
+            // Check if master config is available
+            if (!this.config.master) {
+                console.log('⚠️ No database configuration found, running in mock mode');
+                this.pools.master = null;
+                this.healthStatus.master = false;
+                return;
+            }
+
             // Criar pool master
             this.pools.master = new Pool(this.config.master);
             this.setupPoolEvents(this.pools.master, 'master');
@@ -89,7 +143,9 @@ class ConnectionPoolManager extends EventEmitter {
 
         } catch (error) {
             console.error('❌ Erro ao inicializar pools:', error.message);
-            throw error;
+            console.log('🔄 Running in mock mode due to connection error');
+            this.pools.master = null;
+            this.healthStatus.master = false;
         }
     }
 
