@@ -29,6 +29,24 @@ class BybitService {
     }
 
     /**
+     * Get server time for synchronization
+     */
+    async getServerTime() {
+        try {
+            const response = await axios({
+                method: 'GET',
+                url: `${this.currentURL}/v5/market/time`,
+                timeout: 5000
+            });
+            // Return server time in milliseconds
+            return parseInt(response.data.result.timeSecond) * 1000;
+        } catch (error) {
+            console.warn('⚠️ Could not get server time, using local time');
+            return Date.now();
+        }
+    }
+
+    /**
      * Make authenticated request to Bybit API
      */
     async makeAuthenticatedRequest(endpoint, params = {}, method = 'GET') {
@@ -37,8 +55,10 @@ class BybitService {
                 throw new Error('Bybit API credentials not configured');
             }
 
-            const timestamp = Date.now().toString();
-            const recvWindow = '5000';
+            // Use server time for better synchronization
+            const serverTime = await this.getServerTime();
+            const timestamp = Math.floor(serverTime / 1000).toString(); // Convert to seconds
+            const recvWindow = '10000'; // Increased window for better reliability
             const signature = this.generateSignature(timestamp, recvWindow, params);
 
             const config = {
@@ -181,45 +201,53 @@ class BybitService {
                 accountType: 'UNIFIED'
             });
 
-            if (data.result && data.result.list && data.result.list.length > 0) {
+            console.log('📊 Account Info Response:', JSON.stringify(data, null, 2));
+
+            if (data.retCode === 0 && data.result && data.result.list && data.result.list.length > 0) {
                 const account = data.result.list[0];
                 return {
-                    accountType: account.accountType,
-                    marginMode: account.marginMode,
-                    updatedTime: account.updatedTime,
-                    totalWalletBalance: parseFloat(account.totalWalletBalance),
-                    totalUnrealisedPnl: parseFloat(account.totalUnrealisedPnl),
-                    totalMarginBalance: parseFloat(account.totalMarginBalance),
-                    totalMaintMargin: parseFloat(account.totalMaintMargin),
-                    totalInitialMargin: parseFloat(account.totalInitialMargin),
-                    totalAvailableBalance: parseFloat(account.totalAvailableBalance),
-                    totalPerpUPL: parseFloat(account.totalPerpUPL),
-                    totalPositionIM: parseFloat(account.totalPositionIM),
-                    totalPositionMM: parseFloat(account.totalPositionMM),
-                    totalTakeProfitLiqValue: parseFloat(account.totalTakeProfitLiqValue),
-                    totalStopLossLiqValue: parseFloat(account.totalStopLossLiqValue),
-                    coins: account.coins.map(coin => ({
-                        coin: coin.coin,
-                        walletBalance: parseFloat(coin.walletBalance),
-                        transferBalance: parseFloat(coin.transferBalance),
-                        bonus: parseFloat(coin.bonus),
-                        availableToWithdraw: parseFloat(coin.availableToWithdraw),
-                        availableToBorrow: parseFloat(coin.availableToBorrow),
-                        accruedInterest: parseFloat(coin.accruedInterest),
-                        totalOrderIM: parseFloat(coin.totalOrderIM),
-                        totalPositionIM: parseFloat(coin.totalPositionIM),
-                        totalPositionMM: parseFloat(coin.totalPositionMM),
-                        unrealisedPnl: parseFloat(coin.unrealisedPnl),
-                        cumRealisedPnl: parseFloat(coin.cumRealisedPnl),
-                        used: parseFloat(coin.used)
-                    })),
+                    success: true,
+                    data: {
+                        accountType: account.accountType,
+                        marginMode: account.marginMode,
+                        updatedTime: account.updatedTime,
+                        totalWalletBalance: parseFloat(account.totalWalletBalance || 0),
+                        totalUnrealisedPnl: parseFloat(account.totalUnrealisedPnl || 0),
+                        totalMarginBalance: parseFloat(account.totalMarginBalance || 0),
+                        totalMaintMargin: parseFloat(account.totalMaintMargin || 0),
+                        totalInitialMargin: parseFloat(account.totalInitialMargin || 0),
+                        totalAvailableBalance: parseFloat(account.totalAvailableBalance || 0),
+                        totalPerpUPL: parseFloat(account.totalPerpUPL || 0),
+                        totalPositionIM: parseFloat(account.totalPositionIM || 0),
+                        totalPositionMM: parseFloat(account.totalPositionMM || 0),
+                        totalTakeProfitLiqValue: parseFloat(account.totalTakeProfitLiqValue || 0),
+                        totalStopLossLiqValue: parseFloat(account.totalStopLossLiqValue || 0),
+                        coins: (account.coins || []).map(coin => ({
+                            coin: coin.coin,
+                            walletBalance: parseFloat(coin.walletBalance || 0),
+                            transferBalance: parseFloat(coin.transferBalance || 0),
+                            bonus: parseFloat(coin.bonus || 0),
+                            availableToWithdraw: parseFloat(coin.availableToWithdraw || 0),
+                            availableToBorrow: parseFloat(coin.availableToBorrow || 0),
+                            accruedInterest: parseFloat(coin.accruedInterest || 0),
+                            totalOrderIM: parseFloat(coin.totalOrderIM || 0),
+                            totalPositionIM: parseFloat(coin.totalPositionIM || 0),
+                            totalPositionMM: parseFloat(coin.totalPositionMM || 0),
+                            unrealisedPnl: parseFloat(coin.unrealisedPnl || 0),
+                            cumRealisedPnl: parseFloat(coin.cumRealisedPnl || 0),
+                            used: parseFloat(coin.used || 0)
+                        }))
+                    },
                     timestamp: Date.now()
                 };
+            } else if (data.retCode === 10002) {
+                return { success: false, error: 'Timestamp synchronization issue' };
+            } else {
+                return { success: false, error: data.retMsg || 'Account information not available' };
             }
-            throw new Error('Account information not available');
         } catch (error) {
             console.error('❌ Error fetching account info:', error.message);
-            throw error;
+            return { success: false, error: error.message };
         }
     }
 
@@ -492,7 +520,163 @@ class BybitService {
             throw error;
         }
     }
+
+    /**
+     * Get wallet balance
+     */
+    async getWalletBalance(accountType = 'UNIFIED') {
+        try {
+            const data = await this.makeAuthenticatedRequest('/v5/account/wallet-balance', {
+                accountType: accountType
+            });
+
+            if (data.result && data.result.list) {
+                return {
+                    success: true,
+                    data: data.result.list.map(account => ({
+                        accountType: account.accountType,
+                        totalEquity: parseFloat(account.totalEquity),
+                        accountIMRate: parseFloat(account.accountIMRate),
+                        totalMarginBalance: parseFloat(account.totalMarginBalance),
+                        totalAvailableBalance: parseFloat(account.totalAvailableBalance),
+                        totalPerpUPL: parseFloat(account.totalPerpUPL),
+                        totalInitialMargin: parseFloat(account.totalInitialMargin),
+                        totalPositionIM: parseFloat(account.totalPositionIM),
+                        totalMaintenanceMargin: parseFloat(account.totalMaintenanceMargin),
+                        coins: account.coins.map(coin => ({
+                            coin: coin.coin,
+                            walletBalance: parseFloat(coin.walletBalance),
+                            transferBalance: parseFloat(coin.transferBalance),
+                            bonus: parseFloat(coin.bonus),
+                            availableToWithdraw: parseFloat(coin.availableToWithdraw),
+                            availableToBorrow: parseFloat(coin.availableToBorrow),
+                            accruedInterest: parseFloat(coin.accruedInterest),
+                            totalOrderIM: parseFloat(coin.totalOrderIM),
+                            totalPositionIM: parseFloat(coin.totalPositionIM),
+                            totalPositionMM: parseFloat(coin.totalPositionMM),
+                            unrealisedPnl: parseFloat(coin.unrealisedPnl),
+                            cumRealisedPnl: parseFloat(coin.cumRealisedPnl),
+                            used: parseFloat(coin.used)
+                        }))
+                    })),
+                    timestamp: Date.now()
+                };
+            }
+            return { success: false, error: 'No wallet balance data available' };
+        } catch (error) {
+            console.error('❌ Error fetching wallet balance:', error.message);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Get positions
+     */
+    async getPositions(category = 'linear', symbol = null) {
+        try {
+            const params = { category };
+            if (symbol) params.symbol = symbol.toUpperCase();
+
+            const data = await this.makeAuthenticatedRequest('/v5/position/list', params);
+
+            if (data.result && data.result.list) {
+                return {
+                    success: true,
+                    data: data.result.list.map(position => ({
+                        symbol: position.symbol,
+                        side: position.side,
+                        size: parseFloat(position.size),
+                        positionValue: parseFloat(position.positionValue),
+                        entryPrice: parseFloat(position.entryPrice),
+                        markPrice: parseFloat(position.markPrice),
+                        liqPrice: parseFloat(position.liqPrice),
+                        bustPrice: parseFloat(position.bustPrice),
+                        leverage: parseFloat(position.leverage),
+                        autoAddMargin: position.autoAddMargin,
+                        positionStatus: position.positionStatus,
+                        positionIdx: position.positionIdx,
+                        takeProfit: parseFloat(position.takeProfit),
+                        stopLoss: parseFloat(position.stopLoss),
+                        trailingStop: parseFloat(position.trailingStop),
+                        unrealisedPnl: parseFloat(position.unrealisedPnl),
+                        cumRealisedPnl: parseFloat(position.cumRealisedPnl),
+                        createdTime: position.createdTime,
+                        updatedTime: position.updatedTime
+                    })),
+                    timestamp: Date.now()
+                };
+            }
+            return { success: false, error: 'No positions data available' };
+        } catch (error) {
+            console.error('❌ Error fetching positions:', error.message);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Get order history
+     */
+    async getOrderHistory(category = 'spot', symbol = null, limit = 50) {
+        try {
+            const params = { 
+                category,
+                limit: limit.toString()
+            };
+            if (symbol) params.symbol = symbol.toUpperCase();
+
+            const data = await this.makeAuthenticatedRequest('/v5/order/history', params);
+
+            if (data.result && data.result.list) {
+                return {
+                    success: true,
+                    data: data.result.list.map(order => ({
+                        orderId: order.orderId,
+                        orderLinkId: order.orderLinkId,
+                        blockTradeId: order.blockTradeId,
+                        symbol: order.symbol,
+                        price: parseFloat(order.price),
+                        qty: parseFloat(order.qty),
+                        side: order.side,
+                        isLeverage: order.isLeverage,
+                        positionIdx: order.positionIdx,
+                        orderStatus: order.orderStatus,
+                        cancelType: order.cancelType,
+                        rejectReason: order.rejectReason,
+                        avgPrice: parseFloat(order.avgPrice),
+                        leavesQty: parseFloat(order.leavesQty),
+                        leavesValue: parseFloat(order.leavesValue),
+                        cumExecQty: parseFloat(order.cumExecQty),
+                        cumExecValue: parseFloat(order.cumExecValue),
+                        cumExecFee: parseFloat(order.cumExecFee),
+                        timeInForce: order.timeInForce,
+                        orderType: order.orderType,
+                        stopOrderType: order.stopOrderType,
+                        orderIv: order.orderIv,
+                        triggerPrice: parseFloat(order.triggerPrice),
+                        takeProfit: parseFloat(order.takeProfit),
+                        stopLoss: parseFloat(order.stopLoss),
+                        tpTriggerBy: order.tpTriggerBy,
+                        slTriggerBy: order.slTriggerBy,
+                        triggerDirection: order.triggerDirection,
+                        triggerBy: order.triggerBy,
+                        lastPriceOnCreated: parseFloat(order.lastPriceOnCreated),
+                        reduceOnly: order.reduceOnly,
+                        closeOnTrigger: order.closeOnTrigger,
+                        createdTime: order.createdTime,
+                        updatedTime: order.updatedTime
+                    })),
+                    timestamp: Date.now()
+                };
+            }
+            return { success: false, error: 'No order history data available' };
+        } catch (error) {
+            console.error('❌ Error fetching order history:', error.message);
+            return { success: false, error: error.message };
+        }
+    }
 }
 
 module.exports = BybitService;
+
+
 

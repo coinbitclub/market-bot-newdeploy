@@ -202,8 +202,13 @@ class ConnectionPoolManager extends EventEmitter {
                 }
             } else {
                 // Fallback para master se não há réplicas saudáveis
-                console.log('⚠️ Nenhuma réplica saudável, usando master para leitura');
-                return await this.executeWrite(query, params);
+                if (this.pools.replicas.length === 0) {
+                    // No replicas configured, use master directly (this is normal)
+                    return await this.executeWrite(query, params);
+                } else {
+                    console.log('⚠️ Nenhuma réplica saudável, usando master para leitura');
+                    return await this.executeWrite(query, params);
+                }
             }
 
         } catch (error) {
@@ -258,6 +263,11 @@ class ConnectionPoolManager extends EventEmitter {
      * 🏥 Obter réplica saudável
      */
     getHealthyReplica() {
+        // FIXED: If no replicas are configured, return null to use master directly
+        if (this.pools.replicas.length === 0) {
+            return null;
+        }
+
         const healthyReplicas = this.pools.replicas.filter((_, index) => 
             this.healthStatus.replicas[index]
         );

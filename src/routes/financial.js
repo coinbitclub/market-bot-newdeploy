@@ -5,11 +5,13 @@
 
 const express = require('express');
 const AuthMiddleware = require('../middleware/auth');
+const StripeUnifiedService = require('../services/financial/stripe-unified.service');
 
 class FinancialRoutes {
     constructor() {
         this.router = express.Router();
         this.authMiddleware = new AuthMiddleware();
+        this.stripeService = new StripeUnifiedService();
         this.setupRoutes();
     }
 
@@ -21,6 +23,8 @@ class FinancialRoutes {
         this.router.get('/balances', this.getBalances.bind(this));
         this.router.post('/deposit', this.createDeposit.bind(this));
         this.router.post('/withdraw', this.createWithdraw.bind(this));
+        this.router.post('/recharge', this.createRecharge.bind(this));
+        this.router.post('/coupons/use', this.useCoupon.bind(this));
         this.router.get('/transactions', this.getTransactions.bind(this));
         this.router.get('/exchange-rates', this.getExchangeRates.bind(this));
     }
@@ -147,6 +151,125 @@ class FinancialRoutes {
             });
         } catch (error) {
             res.status(500).json({ error: error.message });
+        }
+    }
+
+    /**
+     * POST /recharge - Create balance recharge session
+     */
+    async createRecharge(req, res) {
+        try {
+            const { amount, currency } = req.body;
+            const userId = req.user.id;
+
+            // Validate input
+            if (!amount || amount <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Valor inválido'
+                });
+            }
+
+            if (!['BRL', 'USD'].includes(currency)) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Moeda não suportada. Use BRL ou USD.'
+                });
+            }
+
+            // Minimum amount validation
+            const minAmount = currency === 'BRL' ? 20 : 5;
+            if (amount < minAmount) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Valor mínimo: ${currency === 'BRL' ? 'R$ 20' : '$5'}`
+                });
+            }
+
+            // Get user data for checkout session
+            const userResult = await this.authMiddleware.dbPoolManager.executeRead(
+                'SELECT email, full_name FROM users WHERE id = $1',
+                [userId]
+            );
+
+            if (userResult.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Usuário não encontrado'
+                });
+            }
+
+            // Create Stripe checkout session for balance recharge
+            const country = currency === 'BRL' ? 'BR' : 'US';
+            const amountInCents = Math.round(amount * 100); // Convert to cents
+
+            const session = await this.stripeService.createCheckoutSession(
+                userId, 'recharge', country, amountInCents
+            );
+
+            res.json({
+                success: true,
+                checkout_url: session.url,
+                session_id: session.id,
+                amount,
+                currency,
+                message: 'Sessão de recarga criada com sucesso'
+            });
+
+        } catch (error) {
+            console.error('❌ Create recharge error:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * POST /coupons/use - Use a coupon
+     */
+    async useCoupon(req, res) {
+        try {
+            const { code } = req.body;
+            const userId = req.user.id;
+
+            if (!code || typeof code !== 'string' || code.trim().length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Código do cupom é obrigatório'
+                });
+            }
+
+            // For now, return a mock response
+            // In production, this would check against database
+            const mockCoupons = {
+                'WELCOME10': { value: 10, currency: 'BRL' },
+                'BONUS50': { value: 50, currency: 'BRL' },
+                'TEST20': { value: 20, currency: 'USD' }
+            };
+
+            const couponData = mockCoupons[code.toUpperCase()];
+
+            if (!couponData) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Cupom inválido ou expirado'
+                });
+            }
+
+            res.json({
+                success: true,
+                value: couponData.value,
+                currency: couponData.currency,
+                message: 'Cupom aplicado com sucesso!'
+            });
+
+        } catch (error) {
+            console.error('❌ Use coupon error:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
         }
     }
 

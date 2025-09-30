@@ -45,6 +45,12 @@ router.post('/withdraw',
     financialController.requestWithdrawal
 );
 
+// RECARGA DE SALDO
+router.post('/recharge',
+    authenticateToken,
+    financialController.createRechargeSession
+);
+
 // CUPONS ADMINISTRATIVOS
 router.post('/coupons',
     authenticateToken,

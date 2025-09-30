@@ -146,3 +146,7 @@ class AdminRoutes {
 }
 
 module.exports = new AdminRoutes();
+
+
+
+

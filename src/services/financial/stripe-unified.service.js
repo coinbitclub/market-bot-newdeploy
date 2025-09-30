@@ -61,6 +61,12 @@ class StripeUnifiedService {
                             description: planType === 'monthly' ? 'Monthly subscription' : 'Account recharge'
                         },
                         unit_amount: finalAmount,
+                        // FIXED: Add recurring configuration for subscription mode
+                        ...(planType === 'monthly' && {
+                            recurring: {
+                                interval: 'month'
+                            }
+                        })
                     },
                     quantity: 1,
                 }],
@@ -364,7 +370,23 @@ class StripeUnifiedService {
                 const existingCustomer = await this.paymentDb.getStripeCustomerByUserId(userId);
                 if (existingCustomer) {
                     console.log(`👤 Existing customer found: ${existingCustomer.stripe_customer_id}`);
-                    return { id: existingCustomer.stripe_customer_id };
+                    
+                    // Verify customer still exists in Stripe
+                    try {
+                        const stripeCustomer = await this.stripe.customers.retrieve(existingCustomer.stripe_customer_id);
+                        if (stripeCustomer && !stripeCustomer.deleted) {
+                            console.log(`✅ Customer verified in Stripe: ${stripeCustomer.id}`);
+                            return stripeCustomer;
+                        } else {
+                            console.log(`⚠️ Customer deleted in Stripe, will create new one`);
+                        }
+                    } catch (stripeError) {
+                        console.log(`⚠️ Customer not found in Stripe: ${stripeError.message}, will create new one`);
+                        // Remove invalid customer reference from database
+                        if (this.paymentDb) {
+                            await this.paymentDb.removeInvalidCustomer(userId);
+                        }
+                    }
                 }
             }
 

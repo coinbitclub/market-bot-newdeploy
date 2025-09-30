@@ -321,6 +321,24 @@ class PaymentDatabaseService {
             throw error;
         }
     }
+
+    /**
+     * Remove invalid customer reference from database
+     */
+    async removeInvalidCustomer(userId) {
+        try {
+            const result = await this.dbPoolManager.executeWrite(
+                `DELETE FROM stripe_customers WHERE user_id = $1`,
+                [userId]
+            );
+            console.log(`🗑️ Removed invalid customer reference for user ${userId}`);
+            return result;
+        } catch (error) {
+            console.error('❌ Error removing invalid customer:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = PaymentDatabaseService;
+

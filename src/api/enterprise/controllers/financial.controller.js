@@ -108,6 +108,63 @@ class FinancialController {
         }
     }
 
+    async createRechargeSession(req, res) {
+        try {
+            const { userId } = req.user;
+            const { amount, currency } = req.body;
+
+            // Validate input
+            if (!amount || amount <= 0) {
+                return res.status(400).json({
+                    error: 'Valor inválido'
+                });
+            }
+
+            if (!['BRL', 'USD'].includes(currency)) {
+                return res.status(400).json({
+                    error: 'Moeda não suportada. Use BRL ou USD.'
+                });
+            }
+
+            // Minimum amount validation
+            const minAmount = currency === 'BRL' ? 20 : 5;
+            if (amount < minAmount) {
+                return res.status(400).json({
+                    error: `Valor mínimo: ${currency === 'BRL' ? 'R$ 20' : '$5'}`
+                });
+            }
+
+            // Get user data for Stripe session
+            const userResult = await db.query(
+                'SELECT email, full_name FROM users WHERE id = $1',
+                [userId]
+            );
+
+            if (userResult.rows.length === 0) {
+                return res.status(404).json({ error: 'Usuário não encontrado' });
+            }
+
+            const user = userResult.rows[0];
+
+            // Create Stripe checkout session for balance recharge
+            const session = await this.stripeService.createBalanceRechargeSession(
+                userId, amount, currency, user.email, user.full_name
+            );
+
+            res.json({
+                success: true,
+                checkout_url: session.url,
+                session_id: session.id,
+                amount,
+                currency
+            });
+
+        } catch (error) {
+            console.error('❌ Create recharge session error:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async generateCoupon(req, res) {
         try {
             const { type, value, currency, description } = req.body;
@@ -250,6 +307,7 @@ module.exports = {
     handleStripeWebhook: financialController.handleStripeWebhook.bind(financialController),
     getBalance: financialController.getBalance.bind(financialController),
     requestWithdrawal: financialController.requestWithdrawal.bind(financialController),
+    createRechargeSession: financialController.createRechargeSession.bind(financialController),
     generateCoupon: financialController.generateCoupon.bind(financialController),
     useCoupon: financialController.useCoupon.bind(financialController),
     getTransactions: financialController.getTransactions.bind(financialController),

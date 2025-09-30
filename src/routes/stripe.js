@@ -24,20 +24,46 @@ class StripeRoutes {
     }
 
     setupRoutes() {
-        // All routes require authentication
+        // Stripe webhook (no authentication required) - MUST be before auth middleware
+        // Raw body middleware is handled at server level for webhook signature verification
+        this.router.post('/webhook', this.handleWebhook.bind(this));
+
+        // All other routes require authentication
         this.router.use(this.authMiddleware.authenticate.bind(this.authMiddleware));
 
         // Stripe payment routes
+        this.router.get('/status', this.getStripeStatus.bind(this));
         this.router.post('/checkout', this.createCheckoutSession.bind(this));
         this.router.post('/payment-intent', this.createPaymentIntent.bind(this));
         this.router.get('/payment-methods', this.getPaymentMethods.bind(this));
         this.router.post('/setup-intent', this.createSetupIntent.bind(this));
-        
-        // Stripe webhook (no authentication required)
-        this.router.post('/webhook', 
-            express.raw({ type: 'application/json' }), 
-            this.handleWebhook.bind(this)
-        );
+    }
+
+    /**
+     * GET /status - Get Stripe integration status
+     */
+    async getStripeStatus(req, res) {
+        try {
+            const status = {
+                success: true,
+                status: 'active',
+                stripe: {
+                    configured: !!process.env.STRIPE_SECRET_KEY,
+                    webhookConfigured: !!process.env.STRIPE_WEBHOOK_SECRET,
+                    testMode: process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_') || false
+                },
+                timestamp: new Date().toISOString()
+            };
+
+            res.json(status);
+        } catch (error) {
+            console.error('❌ Stripe status error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Erro ao obter status do Stripe',
+                code: 'STRIPE_STATUS_ERROR'
+            });
+        }
     }
 
     /**

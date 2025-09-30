@@ -6,7 +6,7 @@
  * Parte da Etapa 2: Sistema Financeiro Completo
  */
 
-const { createLogger } = require('../../shared/utils/logger');
+const { createLogger } = require('../shared/utils/logger');
 
 class PlanValidator {
     constructor(pool, config = {}) {
@@ -133,17 +133,15 @@ class PlanValidator {
      * Obter dados do usuário
      */
     async getUserData(userId) {
-        const client = await this.pool.connect();
-        
         try {
-            const result = await client.query(`
+            const result = await this.pool.executeRead(`
                 SELECT 
                     id, username, email, plan_type, affiliate_type,
                     balance_real_brl, balance_real_usd,
                     balance_admin_brl, balance_admin_usd,
                     balance_commission_brl, balance_commission_usd,
                     created_at, updated_at,
-                    last_operation_at
+                    last_login_at
                 FROM users 
                 WHERE id = $1
             `, [userId]);
@@ -153,9 +151,9 @@ class PlanValidator {
             }
 
             return result.rows[0];
-
-        } finally {
-            client.release();
+        } catch (error) {
+            this.logger.error('Erro ao obter dados do usuário', { error: error.message, userId });
+            throw error;
         }
     }
 
@@ -281,11 +279,9 @@ class PlanValidator {
      * Validar operações concorrentes
      */
     async validateConcurrentOperations(userId) {
-        const client = await this.pool.connect();
-        
         try {
             // Contar operações ativas (mock - seria tabela de operações real)
-            const result = await client.query(`
+            const result = await this.pool.executeRead(`
                 SELECT COUNT(*) as active_operations
                 FROM transactions 
                 WHERE user_id = $1 
@@ -306,9 +302,9 @@ class PlanValidator {
                     'Concurrent operations within limit' : 
                     `Too many concurrent operations. Active: ${activeOperations}, Max: ${this.config.maxConcurrentOperations}`
             };
-
-        } finally {
-            client.release();
+        } catch (error) {
+            this.logger.error('Erro ao validar operações concorrentes', { error: error.message, userId });
+            throw error;
         }
     }
 
@@ -316,16 +312,15 @@ class PlanValidator {
      * Validar cooldown entre operações
      */
     async validateOperationCooldown(userId) {
-        const client = await this.pool.connect();
-        
         try {
-            const result = await client.query(`
-                SELECT last_operation_at 
+            const result = await this.pool.executeRead(`
+                SELECT last_login_at, created_at
                 FROM users 
                 WHERE id = $1
             `, [userId]);
 
-            const lastOperation = result.rows[0].last_operation_at;
+            // Use last_login_at if available, otherwise use created_at
+            const lastOperation = result.rows[0].last_login_at || result.rows[0].created_at;
             
             if (!lastOperation) {
                 return {
@@ -352,9 +347,9 @@ class PlanValidator {
                     'Cooldown period satisfied' : 
                     `Cooldown period not satisfied. Wait ${this.config.operationCooldown - Math.floor(timeDiff)} more seconds`
             };
-
-        } finally {
-            client.release();
+        } catch (error) {
+            this.logger.error('Erro ao validar cooldown', { error: error.message, userId });
+            throw error;
         }
     }
 
@@ -362,20 +357,18 @@ class PlanValidator {
      * Atualizar último tempo de operação
      */
     async updateLastOperationTime(userId) {
-        const client = await this.pool.connect();
-        
         try {
-            await client.query(`
+            await this.pool.executeWrite(`
                 UPDATE users 
-                SET last_operation_at = NOW(),
+                SET last_login_at = NOW(),
                     updated_at = NOW()
                 WHERE id = $1
             `, [userId]);
 
             this.logger.info('Tempo de última operação atualizado', { userId });
-
-        } finally {
-            client.release();
+        } catch (error) {
+            this.logger.error('Erro ao atualizar tempo de última operação', { error: error.message, userId });
+            throw error;
         }
     }
 

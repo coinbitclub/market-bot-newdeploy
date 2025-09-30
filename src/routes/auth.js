@@ -59,7 +59,10 @@ class AuthRoutes {
 
         // 🔍 Validate Token
         this.router.get('/validate', this.validateToken.bind(this));
-        
+
+        // 👤 Get User Profile
+        this.router.get('/profile', this.getUserProfile.bind(this));
+
         console.log('✅ Auth routes setup complete');
     }
 
@@ -415,6 +418,129 @@ class AuthRoutes {
     }
 
     /**
+     * 👤 Get User Profile
+     */
+    async getUserProfile(req, res) {
+        try {
+            const authHeader = req.headers.authorization;
+
+            if (!authHeader) {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Token de acesso necessário'
+                });
+            }
+
+            const token = authHeader.replace('Bearer ', '');
+
+            if (!token) {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Token de acesso necessário'
+                });
+            }
+
+            // Verify token
+            const decoded = jwt.verify(token, this.jwtSecret);
+
+            // Get user from database
+            const userResult = await this.dbPoolManager.executeRead(
+                `SELECT
+                    id, uuid, email, username, full_name, phone, country, language,
+                    user_type, is_admin, is_active, two_factor_enabled,
+                    balance_real_brl, balance_real_usd, balance_admin_brl,
+                    balance_admin_usd, balance_commission_brl, balance_commission_usd,
+                    plan_type, subscription_status, subscription_start_date, subscription_end_date,
+                    affiliate_type, affiliate_code, affiliate_id,
+                    trading_enabled, max_open_positions, max_position_size,
+                    default_leverage, risk_level,
+                    created_at, last_login_at, last_activity_at
+                FROM users WHERE id = $1 AND is_active = true`,
+                [decoded.userId]
+            );
+
+            if (userResult.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Usuário não encontrado'
+                });
+            }
+
+            const user = userResult.rows[0];
+
+            // Return formatted user profile
+            res.json({
+                success: true,
+                user: {
+                    id: user.id,
+                    uuid: user.uuid,
+                    email: user.email,
+                    username: user.username,
+                    full_name: user.full_name,
+                    phone: user.phone,
+                    country: user.country,
+                    language: user.language,
+                    user_type: user.user_type,
+                    is_admin: user.is_admin,
+                    two_factor_enabled: user.two_factor_enabled,
+                    balances: {
+                        real_brl: parseFloat(user.balance_real_brl || 0),
+                        real_usd: parseFloat(user.balance_real_usd || 0),
+                        admin_brl: parseFloat(user.balance_admin_brl || 0),
+                        admin_usd: parseFloat(user.balance_admin_usd || 0),
+                        commission_brl: parseFloat(user.balance_commission_brl || 0),
+                        commission_usd: parseFloat(user.balance_commission_usd || 0)
+                    },
+                    subscription: {
+                        plan_type: user.plan_type,
+                        status: user.subscription_status,
+                        start_date: user.subscription_start_date,
+                        end_date: user.subscription_end_date
+                    },
+                    affiliate: {
+                        type: user.affiliate_type,
+                        code: user.affiliate_code,
+                        referrer_id: user.affiliate_id
+                    },
+                    trading_settings: {
+                        enabled: user.trading_enabled,
+                        max_open_positions: user.max_open_positions,
+                        max_position_size: parseFloat(user.max_position_size || 0.3),
+                        default_leverage: user.default_leverage,
+                        risk_level: user.risk_level
+                    },
+                    timestamps: {
+                        created_at: user.created_at,
+                        last_login_at: user.last_login_at,
+                        last_activity_at: user.last_activity_at
+                    }
+                }
+            });
+
+        } catch (error) {
+            if (error.name === 'TokenExpiredError') {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Token expirado',
+                    code: 'TOKEN_EXPIRED'
+                });
+            } else if (error.name === 'JsonWebTokenError') {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Token inválido',
+                    code: 'TOKEN_INVALID'
+                });
+            } else {
+                console.error('❌ Get user profile error:', error);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Erro interno do servidor'
+                });
+            }
+        }
+    }
+
+    /**
      * 🔌 Get Router
      */
     getRouter() {
@@ -423,3 +549,7 @@ class AuthRoutes {
 }
 
 module.exports = AuthRoutes;
+
+
+
+

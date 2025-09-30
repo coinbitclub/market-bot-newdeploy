@@ -6841,6 +6841,62 @@ const termsRoutes = require('./routes/terms-api');
                 timestamp: new Date().toISOString()
             });
         });
+
+        // FIXED: Add database test endpoint
+        this.app.get('/api/test-db', async (req, res) => {
+            try {
+                if (this.dbPoolManager) {
+                    const result = await this.dbPoolManager.executeRead('SELECT NOW() as current_time, version() as db_version');
+                    res.json({
+                        success: true,
+                        message: 'Database connection working',
+                        data: result.rows[0],
+                        timestamp: new Date().toISOString()
+                    });
+                } else {
+                    res.json({
+                        success: false,
+                        message: 'Database pool manager not initialized',
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            } catch (error) {
+                res.status(500).json({
+                    success: false,
+                    message: 'Database connection failed',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+
+        // FIXED: Add simple auth test endpoint (no auth required for testing)
+        this.app.get('/api/test-auth', (req, res) => {
+            res.json({
+                success: true,
+                message: 'Auth endpoint accessible',
+                timestamp: new Date().toISOString()
+            });
+        });
+
+        // FIXED: Mount API routes from routes/index.js
+        try {
+            console.log('🔗 Mounting API routes...');
+            const { router, setDbPoolManager } = require('../routes/index');
+            
+            // Set database pool manager for all routes
+            if (this.dbPoolManager) {
+                setDbPoolManager(this.dbPoolManager);
+                console.log('✅ Database pool manager set for routes');
+            }
+            
+            // Mount API routes
+            this.app.use('/api', router);
+            console.log('✅ API routes mounted successfully');
+        } catch (error) {
+            console.error('❌ Error mounting API routes:', error.message);
+            console.log('⚠️ Continuing without API routes...');
+        }
     }
 }
 
