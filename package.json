@@ -5,6 +5,7 @@
   "main": "src/enterprise-unified-system.js",
   "scripts": {
     "start": "node src/enterprise-unified-system.js",
+    "orchestrator": "node enterprise-orchestrator.js",
     "setup:database": "node setup-complete-database.js"
   },
   "dependencies": {

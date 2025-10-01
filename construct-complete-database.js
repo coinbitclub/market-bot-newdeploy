@@ -515,6 +515,102 @@ class DatabaseConstructor {
             );
         `, 'Create performance_metrics table');
         this.stats.tablesCreated++;
+
+        // User performance cache
+        await this.executeSQL(`
+            CREATE TABLE IF NOT EXISTS user_performance_cache (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                current_balance DECIMAL(15,4) DEFAULT 0.00,
+                today_profit_loss DECIMAL(15,4) DEFAULT 0.00,
+                today_profit_loss_percentage DECIMAL(10,4) DEFAULT 0.00,
+                today_operations INTEGER DEFAULT 0,
+                today_win_rate DECIMAL(5,2) DEFAULT 0.00,
+                total_profit_loss_usd DECIMAL(15,4) DEFAULT 0.00,
+                total_profit_loss_percentage DECIMAL(10,4) DEFAULT 0.00,
+                total_operations INTEGER DEFAULT 0,
+                total_winning_operations INTEGER DEFAULT 0,
+                total_losing_operations INTEGER DEFAULT 0,
+                win_rate_percentage DECIMAL(5,2) DEFAULT 0.00,
+                overall_win_rate DECIMAL(5,2) DEFAULT 0.00,
+                best_month VARCHAR(7),
+                best_month_profit DECIMAL(15,4) DEFAULT 0.00,
+                biggest_profit_operation DECIMAL(15,4) DEFAULT 0.00,
+                biggest_profit_pair VARCHAR(20),
+                max_drawdown DECIMAL(15,4) DEFAULT 0.00,
+                sharpe_ratio DECIMAL(10,4) DEFAULT 0.00,
+                volatility DECIMAL(10,4) DEFAULT 0.00,
+                average_operation_time_minutes INTEGER DEFAULT 0,
+                last_calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                UNIQUE(user_id)
+            );
+        `, 'Create user_performance_cache table');
+        this.stats.tablesCreated++;
+
+        // Trading pair performance
+        await this.executeSQL(`
+            CREATE TABLE IF NOT EXISTS trading_pair_performance (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                trading_pair VARCHAR(20) NOT NULL,
+                total_profit_loss_usd DECIMAL(15,4) DEFAULT 0.00,
+                total_profit_loss_percentage DECIMAL(10,4) DEFAULT 0.00,
+                total_operations INTEGER DEFAULT 0,
+                win_rate_percentage DECIMAL(5,2) DEFAULT 0.00,
+                avg_profit_per_operation DECIMAL(15,4) DEFAULT 0.00,
+                best_operation_profit DECIMAL(15,4) DEFAULT 0.00,
+                worst_operation_loss DECIMAL(15,4) DEFAULT 0.00,
+                last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                UNIQUE(user_id, trading_pair)
+            );
+        `, 'Create trading_pair_performance table');
+        this.stats.tablesCreated++;
+
+        // User performance monthly
+        await this.executeSQL(`
+            CREATE TABLE IF NOT EXISTS user_performance_monthly (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                performance_month VARCHAR(7) NOT NULL,
+                total_profit_loss_usd DECIMAL(15,4) DEFAULT 0.00,
+                total_profit_loss_percentage DECIMAL(10,4) DEFAULT 0.00,
+                total_operations INTEGER DEFAULT 0,
+                win_rate_percentage DECIMAL(5,2) DEFAULT 0.00,
+                best_day DATE,
+                best_day_profit DECIMAL(15,4) DEFAULT 0.00,
+                worst_day DATE,
+                worst_day_loss DECIMAL(15,4) DEFAULT 0.00,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                UNIQUE(user_id, performance_month)
+            );
+        `, 'Create user_performance_monthly table');
+        this.stats.tablesCreated++;
+
+        // User performance daily
+        await this.executeSQL(`
+            CREATE TABLE IF NOT EXISTS user_performance_daily (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                performance_date DATE NOT NULL,
+                starting_balance DECIMAL(15,4) DEFAULT 0.00,
+                ending_balance DECIMAL(15,4) DEFAULT 0.00,
+                balance_change DECIMAL(15,4) DEFAULT 0.00,
+                total_profit_loss_usd DECIMAL(15,4) DEFAULT 0.00,
+                total_profit_loss_percentage DECIMAL(10,4) DEFAULT 0.00,
+                total_operations INTEGER DEFAULT 0,
+                win_rate_percentage DECIMAL(5,2) DEFAULT 0.00,
+                winning_operations INTEGER DEFAULT 0,
+                losing_operations INTEGER DEFAULT 0,
+                avg_profit_per_operation DECIMAL(15,4) DEFAULT 0.00,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                UNIQUE(user_id, performance_date)
+            );
+        `, 'Create user_performance_daily table');
+        this.stats.tablesCreated++;
     }
 
     async createPaymentTables() {
@@ -771,6 +867,15 @@ class DatabaseConstructor {
             'CREATE INDEX IF NOT EXISTS idx_perf_user_id ON performance_metrics(user_id);',
             'CREATE INDEX IF NOT EXISTS idx_perf_metric_key ON performance_metrics(metric_key);',
             'CREATE INDEX IF NOT EXISTS idx_perf_timestamp ON performance_metrics(timestamp DESC);',
+            
+            // Performance cache and analytics indexes
+            'CREATE INDEX IF NOT EXISTS idx_perf_cache_user_id ON user_performance_cache(user_id);',
+            'CREATE INDEX IF NOT EXISTS idx_pair_perf_user_id ON trading_pair_performance(user_id);',
+            'CREATE INDEX IF NOT EXISTS idx_pair_perf_pair ON trading_pair_performance(trading_pair);',
+            'CREATE INDEX IF NOT EXISTS idx_monthly_perf_user_id ON user_performance_monthly(user_id);',
+            'CREATE INDEX IF NOT EXISTS idx_monthly_perf_month ON user_performance_monthly(performance_month DESC);',
+            'CREATE INDEX IF NOT EXISTS idx_daily_perf_user_id ON user_performance_daily(user_id);',
+            'CREATE INDEX IF NOT EXISTS idx_daily_perf_date ON user_performance_daily(performance_date DESC);',
             
             // Payment transactions indexes
             'CREATE INDEX IF NOT EXISTS idx_payment_user_id ON payment_transactions(user_id);',
