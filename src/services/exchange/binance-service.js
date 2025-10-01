@@ -221,6 +221,7 @@ class BinanceService {
                 side,
                 type = 'MARKET',
                 quantity,
+                qty,  // Accept both 'quantity' and 'qty' parameter names
                 price = null,
                 timeInForce = 'GTC',
                 newClientOrderId = null,
@@ -228,11 +229,18 @@ class BinanceService {
                 icebergQty = null
             } = orderParams;
 
+            // Use quantity if provided, otherwise use qty (trading engine sends 'qty')
+            const actualQuantity = quantity || qty;
+
+            if (!actualQuantity) {
+                throw new Error('Quantity (qty) is required for order placement');
+            }
+
             const params = {
                 symbol: symbol.toUpperCase(),
                 side: side.toUpperCase(),
                 type: type.toUpperCase(),
-                quantity: quantity.toString(),
+                quantity: actualQuantity.toString(),
                 timeInForce
             };
 

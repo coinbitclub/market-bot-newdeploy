@@ -21,12 +21,14 @@ const adminRoutes = require('./admin');
 const PerformanceRoutes = require('./performance');
 const OperationsRoutes = require('./operations');
 const TradingViewWebhookRoutes = require('./tradingview-webhook');
+const UserAPIKeysRoutes = require('./user-api-keys');
 
 // Create auth routes instance
 const authRoutes = new AuthRoutes();
 const performanceRoutes = new PerformanceRoutes();
 const operationsRoutes = new OperationsRoutes();
 const tradingViewWebhookRoutes = new TradingViewWebhookRoutes();
+const userAPIKeysRoutes = new UserAPIKeysRoutes();
 
 // Function to set database pool manager for all routes
 const setDbPoolManager = (dbPoolManager) => {
@@ -42,6 +44,7 @@ const setDbPoolManager = (dbPoolManager) => {
     // FIXED: Add performance and operations routes database setup
     performanceRoutes.setDbPoolManager(dbPoolManager);
     operationsRoutes.setDbPoolManager(dbPoolManager);
+    userAPIKeysRoutes.setDbPoolManager(dbPoolManager);
 };
 
 // API Status
@@ -64,8 +67,11 @@ router.get('/status', (req, res) => {
             admin: 'active',
             performance: 'active',
             operations: 'active',
-            tradingViewWebhooks: 'active'
-        }
+            tradingViewWebhooks: 'active',
+            userAPIKeys: 'active'
+        },
+        tradingMode: 'PERSONAL',
+        note: 'Users must connect their own Bybit/Binance API keys to trade'
     });
 });
 
@@ -148,5 +154,6 @@ router.use('/admin', adminRoutes.getRouter());
 router.use('/performance', performanceRoutes.getRouter());
 router.use('/operations', operationsRoutes.getRouter());
 router.use('/tradingview', tradingViewWebhookRoutes.getRouter());
+router.use('/user-api-keys', userAPIKeysRoutes.getRouter());
 
 module.exports = { router, setDbPoolManager };

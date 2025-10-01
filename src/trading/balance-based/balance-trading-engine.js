@@ -82,9 +82,12 @@ class BalanceTradingEngine {
 
             // 5. Create position tracking for successful trades
             const successfulTrades = executionResults.filter(t => t.success);
-            if (successfulTrades.length > 0) {
-                const tradeId = `TRADE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const tradeId = `TRADE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+            // Store tradeId for later use
+            signal.tradeId = tradeId;
+
+            if (successfulTrades.length > 0) {
                 await this.positionTracker.createPosition(tradeId, {
                     symbol: signal.symbol,
                     side: aiDecision.action,
@@ -246,11 +249,6 @@ class BalanceTradingEngine {
                 // Execute actual trade using admin API keys
                 const tradeResult = await this.executeActualTrade(signal, aiDecision, user, positionSize);
 
-                if (tradeResult.success) {
-                    // Update user balance with trade result
-                    await this.updateUserBalanceAfterTrade(user.id, tradeResult, planConfig.commission);
-                }
-
                 const tradeData = {
                     userId: user.id,
                     username: user.username,
@@ -261,6 +259,14 @@ class BalanceTradingEngine {
                     side: aiDecision.action,
                     ...tradeResult
                 };
+
+                // Save trade execution to database
+                await this.saveTradeExecution(signal.tradeId || `TRADE_${Date.now()}`, tradeData);
+
+                if (tradeResult.success) {
+                    // Update user balance with trade result
+                    await this.updateUserBalanceAfterTrade(user.id, tradeResult, planConfig.commission);
+                }
 
                 // Broadcast individual trade execution to user and admin
                 tradingWebSocket.broadcastTradeExecution(user.id, tradeData);
@@ -300,14 +306,22 @@ class BalanceTradingEngine {
      */
     async executeActualTrade(signal, aiDecision, user, positionSize) {
         try {
-            const isTestMode = process.env.NODE_ENV !== 'production';
+            // Allow real API calls if ENABLE_REAL_TRADING is true OR if using testnet exchanges
+            const isProductionMode = process.env.NODE_ENV === 'production';
+            const enableRealTrading = process.env.ENABLE_REAL_TRADING === 'true';
+            const usingTestnet = process.env.BYBIT_TESTNET === 'true' || process.env.BINANCE_TESTNET === 'true';
 
-            if (isTestMode) {
-                // Simulate trade execution in test mode
+            const shouldSimulate = !isProductionMode && !enableRealTrading && !usingTestnet;
+
+            if (shouldSimulate) {
+                // Simulate trade execution only when not in production, real trading disabled, and not using testnet
                 const simulatedResult = this.simulateTradeExecution(signal, aiDecision, positionSize);
-                console.log(`🧪 TESTNET: Simulated trade for ${user.username}: ${simulatedResult.message}`);
+                console.log(`🧪 SIMULATED: Simulated trade for ${user.username}: ${simulatedResult.message}`);
                 return simulatedResult;
             }
+
+            // Real trade execution using admin API keys (production OR testnet)
+            console.log(`🔥 REAL API CALL: Executing trade for ${user.username} on ${usingTestnet ? 'TESTNET' : 'PRODUCTION'}`);
 
             // Real trade execution using admin API keys
             const tradeParams = {
@@ -389,12 +403,50 @@ class BalanceTradingEngine {
     }
 
     /**
+     * Save trade execution to database
+     */
+    async saveTradeExecution(tradeId, tradeData) {
+        try {
+            await this.dbPoolManager.executeWrite(`
+                INSERT INTO trade_executions (
+                    trade_id, user_id, username, plan_type, symbol, side, exchange,
+                    order_id, position_size, executed_price, executed_qty,
+                    commission_percent, success, error_message, simulated, metadata
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            `, [
+                tradeId,
+                tradeData.userId,
+                tradeData.username,
+                tradeData.planType,
+                tradeData.symbol,
+                tradeData.side,
+                tradeData.exchange || 'testnet',
+                tradeData.orderId,
+                tradeData.positionSize,
+                tradeData.executedPrice,
+                tradeData.executedQty,
+                tradeData.commission,
+                tradeData.success,
+                tradeData.message || null,
+                tradeData.simulated || false,
+                JSON.stringify({
+                    timestamp: tradeData.timestamp,
+                    stopLoss: tradeData.stopLoss,
+                    takeProfit: tradeData.takeProfit
+                })
+            ]);
+
+            console.log(`💾 Trade execution saved to database: ${tradeId} for user ${tradeData.username}`);
+        } catch (error) {
+            console.error('❌ Error saving trade execution:', error.message);
+        }
+    }
+
+    /**
      * Update user balance after trade execution
      */
     async updateUserBalanceAfterTrade(userId, tradeResult, commissionPercent) {
         try {
-            // For now, just log the trade - in production this would update balances
-            // based on actual P&L from the exchange
             console.log(`💰 Trade recorded for user ${userId}:`, {
                 orderId: tradeResult.orderId,
                 exchange: tradeResult.exchange,

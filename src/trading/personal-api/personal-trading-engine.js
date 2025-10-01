@@ -1,0 +1,417 @@
+/**
+ * 🔑 PERSONAL API KEY TRADING ENGINE
+ * Executes trades using users' personal Bybit/Binance API keys
+ *
+ * IMPORTANT: This is the ONLY trading engine - no admin/pooled keys are used.
+ * Users MUST connect their own Bybit/Binance accounts to trade.
+ */
+
+const UserAPIKeyManager = require('../../services/user-api-keys/user-api-key-manager');
+const AIDecision = require('../enterprise/ai-decision');
+const MarketAnalyzer = require('../enterprise/market-analyzer');
+const tradingWebSocket = require('../../services/websocket/trading-websocket');
+
+class PersonalTradingEngine {
+    constructor(dbPoolManager) {
+        this.dbPoolManager = dbPoolManager;
+        this.apiKeyManager = new UserAPIKeyManager(dbPoolManager);
+        this.aiDecision = new AIDecision();
+        this.marketAnalyzer = new MarketAnalyzer();
+
+        // Plan-based execution priorities
+        this.PLAN_PRIORITIES = {
+            'PRO_BR': { priority: 1, delay: 0, commission: 10 },
+            'PRO_US': { priority: 1, delay: 0, commission: 10 },
+            'FLEX_BR': { priority: 2, delay: 1000, commission: 20 },
+            'FLEX_US': { priority: 2, delay: 1000, commission: 20 },
+            'TRIAL': { priority: 3, delay: 3000, commission: 0 }
+        };
+
+        console.log('🔑 Personal API Key Trading Engine initialized');
+    }
+
+    /**
+     * Process signal for all users using their personal API keys
+     */
+    async processSignalForAllUsers(signal) {
+        try {
+            console.log('📡 Processing signal with personal API keys:', signal);
+
+            // Broadcast signal
+            tradingWebSocket.broadcastSignalReceived(signal);
+
+            // 1. Get market analysis
+            const marketAnalysis = await this.marketAnalyzer.analyzeMarket(signal.symbol || 'BTCUSDT');
+
+            // 2. Make AI decision
+            const aiDecision = await this.aiDecision.makeDecision(signal, marketAnalysis);
+            console.log(`🤖 AI Decision: ${aiDecision.action} (confidence: ${aiDecision.confidence}%)`);
+
+            tradingWebSocket.broadcastAIDecision(aiDecision, signal);
+
+            if (aiDecision.action === 'HOLD') {
+                return {
+                    success: true,
+                    message: 'AI decided to HOLD - no trades executed',
+                    aiDecision,
+                    totalUsers: 0,
+                    executedTrades: []
+                };
+            }
+
+            // 3. Get users with personal API keys configured
+            const activeUsers = await this.getUsersWithPersonalKeys(signal.symbol);
+
+            if (activeUsers.length === 0) {
+                return {
+                    success: true,
+                    message: 'No users with personal API keys found',
+                    aiDecision,
+                    totalUsers: 0,
+                    executedTrades: []
+                };
+            }
+
+            console.log(`👥 Found ${activeUsers.length} users with personal API keys`);
+
+            // 4. Execute trades by plan priority
+            const executionResults = await this.executeTradesByPriority(signal, aiDecision, activeUsers);
+
+            // 5. Broadcast execution summary
+            const finalResult = {
+                success: true,
+                message: `Trades executed for ${executionResults.length} users`,
+                aiDecision,
+                totalUsers: activeUsers.length,
+                executedTrades: executionResults,
+                marketAnalysis: {
+                    sentiment: marketAnalysis.sentiment,
+                    fearGreed: marketAnalysis.fearGreedIndex
+                }
+            };
+
+            tradingWebSocket.broadcastExecutionSummary(finalResult);
+
+            return finalResult;
+
+        } catch (error) {
+            console.error('❌ Error processing signal:', error);
+            return {
+                success: false,
+                error: error.message,
+                aiDecision: null,
+                totalUsers: 0,
+                executedTrades: []
+            };
+        }
+    }
+
+    /**
+     * Get users who have personal API keys configured and verified
+     * ADAPTED: Uses existing user_api_keys table structure
+     */
+    async getUsersWithPersonalKeys(symbol) {
+        try {
+            // Determine preferred exchange based on symbol
+            const preferredExchange = this.getPreferredExchange(symbol);
+
+            // Get users with verified personal API keys (PERSONAL mode only - no admin keys)
+            // Uses existing user_api_keys table
+            const result = await this.dbPoolManager.executeRead(`
+                SELECT DISTINCT
+                    u.id, u.username, u.plan_type, u.subscription_status,
+                    u.balance_real_brl, u.balance_real_usd,
+                    u.balance_admin_brl, u.balance_admin_usd,
+                    u.max_open_positions, u.default_leverage, u.risk_level,
+                    u.trading_mode,
+                    uak.exchange as preferred_exchange,
+                    uak.api_key,
+                    uak.verified,
+                    uak.enabled,
+                    uak.is_active
+                FROM users u
+                INNER JOIN user_api_keys uak ON u.id = uak.user_id
+                WHERE u.subscription_status = 'active'
+                AND (u.trading_mode = 'PERSONAL' OR u.trading_mode IS NULL)
+                AND uak.exchange = $1
+                AND uak.is_active = TRUE
+                AND uak.enabled = TRUE
+                AND uak.verified = TRUE
+                AND uak.api_key IS NOT NULL
+                AND uak.api_secret IS NOT NULL
+                ORDER BY
+                    CASE
+                        WHEN u.plan_type LIKE 'PRO%' THEN 1
+                        WHEN u.plan_type LIKE 'FLEX%' THEN 2
+                        WHEN u.plan_type = 'TRIAL' THEN 3
+                        ELSE 4
+                    END
+            `, [preferredExchange.toLowerCase()]);
+
+            return result.rows.map(user => ({
+                ...user,
+                operationalBalance: {
+                    brl: parseFloat(user.balance_real_brl || 0) + parseFloat(user.balance_admin_brl || 0),
+                    usd: parseFloat(user.balance_real_usd || 0) + parseFloat(user.balance_admin_usd || 0)
+                },
+                planConfig: this.PLAN_PRIORITIES[user.plan_type] || this.PLAN_PRIORITIES['TRIAL'],
+                preferredExchange: user.preferred_exchange || preferredExchange
+            }));
+
+        } catch (error) {
+            console.error('❌ Error getting users with personal keys:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Determine preferred exchange based on symbol
+     */
+    getPreferredExchange(symbol) {
+        // You can implement logic here to choose exchange based on:
+        // - Symbol availability
+        // - Better liquidity
+        // - Lower fees
+        // For now, use environment preference or default to Bybit
+        return process.env.PREFERRED_EXCHANGE || 'bybit';
+    }
+
+    /**
+     * Execute trades by plan priority with delays
+     */
+    async executeTradesByPriority(signal, aiDecision, users) {
+        const results = [];
+        const usersByPlan = this.groupUsersByPlan(users);
+
+        // Execute by priority with delays
+        for (const [planType, planUsers] of Object.entries(usersByPlan)) {
+            const planConfig = this.PLAN_PRIORITIES[planType];
+
+            console.log(`⏳ Executing for ${planType} users (${planUsers.length}) with ${planConfig.delay}ms delay`);
+
+            // Apply plan-based delay
+            if (planConfig.delay > 0) {
+                await this.sleep(planConfig.delay);
+            }
+
+            // Execute trades for this plan group (in parallel for better performance)
+            const planResults = await Promise.all(
+                planUsers.map(user => this.executePersonalTrade(signal, aiDecision, user, planConfig))
+            );
+
+            results.push(...planResults);
+        }
+
+        return results;
+    }
+
+    /**
+     * Group users by plan type for priority execution
+     */
+    groupUsersByPlan(users) {
+        const grouped = {};
+
+        users.forEach(user => {
+            const planType = user.plan_type || 'TRIAL';
+            if (!grouped[planType]) {
+                grouped[planType] = [];
+            }
+            grouped[planType].push(user);
+        });
+
+        // Sort by priority
+        const sortedGroups = {};
+        Object.keys(grouped)
+            .sort((a, b) => this.PLAN_PRIORITIES[a].priority - this.PLAN_PRIORITIES[b].priority)
+            .forEach(planType => {
+                sortedGroups[planType] = grouped[planType];
+            });
+
+        return sortedGroups;
+    }
+
+    /**
+     * Execute trade using user's personal API key
+     */
+    async executePersonalTrade(signal, aiDecision, user, planConfig) {
+        try {
+            console.log(`📈 Executing personal trade for user ${user.username} (${user.plan_type})`);
+
+            // Calculate position size based on user balance
+            const positionSize = this.calculatePositionSize(user, signal);
+
+            if (positionSize <= 0) {
+                return {
+                    userId: user.id,
+                    username: user.username,
+                    success: false,
+                    message: 'Insufficient balance for minimum position'
+                };
+            }
+
+            // Get user's API credentials
+            const credentials = await this.apiKeyManager.getAPICredentials(user.id, user.preferredExchange);
+
+            if (!credentials.success || !credentials.enabled) {
+                return {
+                    userId: user.id,
+                    username: user.username,
+                    success: false,
+                    message: 'API key not available or not enabled'
+                };
+            }
+
+            // Create exchange service with user's credentials
+            const exchangeService = await this.createUserExchangeService(user.preferredExchange, credentials);
+
+            // Prepare trade parameters
+            const tradeParams = {
+                symbol: signal.symbol,
+                side: aiDecision.action === 'BUY' ? 'Buy' : 'Sell',
+                orderType: 'Market',
+                qty: this.calculateQuantity(signal.symbol, positionSize),
+                stopLoss: aiDecision.stopLoss,
+                takeProfit: aiDecision.takeProfit
+            };
+
+            // Execute trade
+            console.log(`🔥 Executing personal API call for ${user.username} on ${user.preferredExchange}`);
+            const result = await exchangeService.placeOrder(tradeParams);
+
+            const tradeData = {
+                userId: user.id,
+                username: user.username,
+                planType: user.plan_type,
+                positionSize,
+                commission: planConfig.commission,
+                symbol: signal.symbol,
+                side: aiDecision.action,
+                success: result.success || false,
+                message: result.message || result.error || 'Trade executed',
+                orderId: result.orderId,
+                exchange: user.preferredExchange,
+                executedPrice: result.price || signal.price,
+                executedQty: tradeParams.qty,
+                timestamp: new Date().toISOString(),
+                personalKey: true
+            };
+
+            // Save trade execution
+            await this.saveTradeExecution(`TRADE_${Date.now()}_${user.id}`, tradeData);
+
+            // Broadcast to user
+            tradingWebSocket.broadcastTradeExecution(user.id, tradeData);
+
+            return tradeData;
+
+        } catch (error) {
+            console.error(`❌ Error executing trade for user ${user.username}:`, error);
+            return {
+                userId: user.id,
+                username: user.username,
+                success: false,
+                message: error.message,
+                personalKey: true
+            };
+        }
+    }
+
+    /**
+     * Create exchange service with user's personal credentials
+     */
+    async createUserExchangeService(exchange, credentials) {
+        if (exchange.toLowerCase() === 'bybit') {
+            const BybitService = require('../../services/exchange/bybit-service');
+            const service = new BybitService();
+            // Override with user's credentials
+            service.apiKey = credentials.apiKey;
+            service.apiSecret = credentials.apiSecret;
+            return service;
+        } else {
+            const BinanceService = require('../../services/exchange/binance-service');
+            const service = new BinanceService();
+            service.apiKey = credentials.apiKey;
+            service.apiSecret = credentials.apiSecret;
+            return service;
+        }
+    }
+
+    /**
+     * Calculate position size based on user balance and risk
+     */
+    calculatePositionSize(user, signal) {
+        const availableBalance = Math.max(user.operationalBalance.brl / 5.5, user.operationalBalance.usd);
+        const riskPercent = (user.risk_level || 2) / 100;
+        const maxPositionSize = availableBalance * riskPercent;
+        const minPositionSize = 10;
+
+        return Math.max(minPositionSize, Math.min(maxPositionSize, availableBalance * 0.1));
+    }
+
+    /**
+     * Calculate quantity based on symbol and position size
+     */
+    calculateQuantity(symbol, positionSizeUSD) {
+        const approximatePrices = {
+            'BTCUSDT': 50000,
+            'ETHUSDT': 3000,
+            'ADAUSDT': 0.5,
+            'SOLUSDT': 100
+        };
+
+        const price = approximatePrices[symbol] || approximatePrices['BTCUSDT'];
+        const quantity = positionSizeUSD / price;
+
+        if (symbol.includes('BTC')) return Math.round(quantity * 100000) / 100000;
+        if (symbol.includes('ETH')) return Math.round(quantity * 1000) / 1000;
+        return Math.round(quantity * 100) / 100;
+    }
+
+    /**
+     * Save trade execution to database
+     */
+    async saveTradeExecution(tradeId, tradeData) {
+        try {
+            await this.dbPoolManager.executeWrite(`
+                INSERT INTO trade_executions (
+                    trade_id, user_id, username, plan_type, symbol, side, exchange,
+                    order_id, position_size, executed_price, executed_qty,
+                    commission_percent, success, error_message, simulated, metadata
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            `, [
+                tradeId,
+                tradeData.userId,
+                tradeData.username,
+                tradeData.planType,
+                tradeData.symbol,
+                tradeData.side,
+                tradeData.exchange,
+                tradeData.orderId,
+                tradeData.positionSize,
+                tradeData.executedPrice,
+                tradeData.executedQty,
+                tradeData.commission,
+                tradeData.success,
+                tradeData.message || null,
+                false,
+                JSON.stringify({
+                    timestamp: tradeData.timestamp,
+                    personalKey: tradeData.personalKey
+                })
+            ]);
+
+            console.log(`💾 Personal trade saved: ${tradeId} for user ${tradeData.username}`);
+        } catch (error) {
+            console.error('❌ Error saving trade execution:', error.message);
+        }
+    }
+
+    /**
+     * Helper function for delays
+     */
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
+
+module.exports = PersonalTradingEngine;

@@ -11,22 +11,12 @@ class BybitService {
         this.baseURL = 'https://api.bybit.com';
         this.testnetURL = 'https://api-testnet.bybit.com';
         this.isTestnet = process.env.BYBIT_TESTNET === 'true';
-
-        // Use test credentials when in testnet mode
-        if (this.isTestnet) {
-            this.apiKey = process.env.BYBIT_TEST_API_KEY || process.env.BYBIT_API_KEY;
-            this.apiSecret = process.env.BYBIT_TEST_API_SECRET || process.env.BYBIT_API_SECRET;
-        } else {
-            this.apiKey = process.env.BYBIT_API_KEY;
-            this.apiSecret = process.env.BYBIT_API_SECRET;
-        }
+        this.apiKey = process.env.BYBIT_API_KEY;
+        this.apiSecret = process.env.BYBIT_API_SECRET;
         
         this.currentURL = this.isTestnet ? this.testnetURL : this.baseURL;
         
         console.log(`🔥 Bybit Service initialized - ${this.isTestnet ? 'TESTNET' : 'MAINNET'}`);
-        if (this.isTestnet && this.apiKey) {
-            console.log(`🔑 Using Bybit testnet API key: ${this.apiKey.substring(0, 8)}...`);
-        }
     }
 
     /**

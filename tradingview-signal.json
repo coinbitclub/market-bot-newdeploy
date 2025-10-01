@@ -1,0 +1,10 @@
+{
+  "action": "BUY",
+  "symbol": "BTCUSDT",
+  "price": 63500,
+  "strategy": "TradingView Momentum Strategy",
+  "stop_loss": 62000,
+  "take_profit": 66000,
+  "timeframe": "15m",
+  "alert_name": "Bitcoin BUY Signal"
+}

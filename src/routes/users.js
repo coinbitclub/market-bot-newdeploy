@@ -5,11 +5,13 @@
 
 const express = require('express');
 const AuthMiddleware = require('../middleware/auth');
+const UserAPIKeyManager = require('../services/user-api-keys/user-api-key-manager');
 
 class UserSettingsRoutes {
     constructor() {
         this.router = express.Router();
         this.authMiddleware = new AuthMiddleware();
+        this.apiKeyManager = null; // Will be initialized when DB pool manager is set
         this.setupRoutes();
     }
 
@@ -18,6 +20,8 @@ class UserSettingsRoutes {
      */
     setDbPoolManager(dbPoolManager) {
         this.authMiddleware.setDbPoolManager(dbPoolManager);
+        // Initialize encrypted API key manager
+        this.apiKeyManager = new UserAPIKeyManager(dbPoolManager);
     }
 
     setupRoutes() {
@@ -603,25 +607,53 @@ class UserSettingsRoutes {
     }
 
     /**
-     * GET /api-keys - Get user API keys
+     * GET /api-keys - Get user API keys (UPDATED TO USE ENCRYPTION)
      */
     async getApiKeys(req, res) {
         try {
-            const result = await this.authMiddleware.dbPoolManager.executeRead(
-                'SELECT id, exchange, api_key, environment, is_active, last_validated_at, is_valid, created_at FROM user_api_keys WHERE user_id = $1',
-                [req.user.id]
-            );
+            if (!this.apiKeyManager) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'API key manager not initialized'
+                });
+            }
 
-            // Hide sensitive data (api_secret)
-            const apiKeys = result.rows.map(key => ({
-                ...key,
-                api_key: key.api_key ? key.api_key.substring(0, 8) + '...' : '',
-                api_secret: '***hidden***'
-            }));
+            // Get status for both exchanges using encrypted manager
+            const bybitStatus = await this.apiKeyManager.getAPIKeyStatus(req.user.id, 'bybit');
+            const binanceStatus = await this.apiKeyManager.getAPIKeyStatus(req.user.id, 'binance');
+
+            const apiKeys = [];
+
+            if (bybitStatus.has_key) {
+                apiKeys.push({
+                    id: 'bybit',
+                    exchange: 'BYBIT',
+                    api_key: bybitStatus.masked_key,
+                    environment: 'mainnet',
+                    is_active: bybitStatus.enabled,
+                    is_valid: bybitStatus.verified,
+                    last_validated_at: bybitStatus.verified_at,
+                    created_at: null
+                });
+            }
+
+            if (binanceStatus.has_key) {
+                apiKeys.push({
+                    id: 'binance',
+                    exchange: 'BINANCE',
+                    api_key: binanceStatus.masked_key,
+                    environment: 'mainnet',
+                    is_active: binanceStatus.enabled,
+                    is_valid: binanceStatus.verified,
+                    last_validated_at: binanceStatus.verified_at,
+                    created_at: null
+                });
+            }
 
             res.json({
                 success: true,
-                apiKeys: apiKeys
+                apiKeys: apiKeys,
+                note: 'API secrets are encrypted with AES-256-GCM'
             });
         } catch (error) {
             console.error('❌ Get API keys error:', error);
@@ -633,20 +665,18 @@ class UserSettingsRoutes {
     }
 
     /**
-     * POST /api-keys - Add new API key
+     * POST /api-keys - Add new API key (UPDATED TO USE ENCRYPTION)
      */
     async addApiKey(req, res) {
         try {
-            const {
-                exchange: rawExchange,
-                api_key,
-                api_secret,
-                passphrase,
-                environment
-            } = req.body;
+            const { exchange, api_key, api_secret } = req.body;
 
-            // Convert exchange to uppercase to match database constraint
-            const exchange = rawExchange ? rawExchange.toUpperCase() : null;
+            if (!this.apiKeyManager) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'API key manager not initialized'
+                });
+            }
 
             // Validate required fields
             if (!exchange || !api_key || !api_secret) {
@@ -656,142 +686,46 @@ class UserSettingsRoutes {
                 });
             }
 
-            // Check if API key already exists for this exchange
-            const existing = await this.authMiddleware.dbPoolManager.executeRead(
-                'SELECT id FROM user_api_keys WHERE user_id = $1 AND exchange = $2',
-                [req.user.id, exchange]
-            );
-
-            if (existing.rows.length > 0) {
+            // Validate exchange
+            const exchangeLower = exchange.toLowerCase();
+            if (!['bybit', 'binance'].includes(exchangeLower)) {
                 return res.status(400).json({
                     success: false,
-                    error: `API key for ${exchange} already exists. Please update or delete the existing one.`
+                    error: 'Supported exchanges: bybit, binance'
                 });
             }
 
-            const result = await this.authMiddleware.dbPoolManager.executeWrite(
-                `INSERT INTO user_api_keys (
-                    user_id, exchange, api_key, api_secret, api_passphrase, environment, is_active
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING id, exchange, environment, is_active, created_at`,
-                [req.user.id, exchange, api_key, api_secret, passphrase || null, environment, true]
+            // Use encrypted API key manager
+            const result = await this.apiKeyManager.saveAPIKey(
+                req.user.id,
+                exchangeLower,
+                api_key,
+                api_secret
             );
 
-            // Also sync to users table for backward compatibility
-            await this.syncApiKeyToUsersTable(req.user.id, exchange, api_key, api_secret, passphrase, environment);
+            if (!result.success) {
+                return res.status(400).json(result);
+            }
+
+            // Verify immediately
+            const verifyResult = await this.apiKeyManager.verifyAPIKey(req.user.id, exchangeLower);
 
             res.json({
                 success: true,
-                message: 'API key added successfully',
-                apiKey: result.rows[0]
+                message: 'API key added and verified successfully',
+                apiKey: {
+                    id: exchangeLower,
+                    exchange: exchange.toUpperCase(),
+                    api_key: result.masked_key,
+                    environment: 'mainnet',
+                    is_active: true,
+                    is_valid: verifyResult.success,
+                    verification: verifyResult.success ? 'verified' : 'failed'
+                },
+                note: 'API secret encrypted with AES-256-GCM'
             });
         } catch (error) {
             console.error('❌ Add API key error:', error);
-
-            // Handle check constraint violations
-            if (error.code === "23514") {
-                if (error.constraint === "chk_exchange") {
-                    return res.status(400).json({
-                        success: false,
-                        error: `Invalid exchange "${rawExchange}". Supported exchanges: BINANCE, BYBIT, OKX, BITGET`
-                    });
-                }
-                if (error.constraint === "chk_environment") {
-                    return res.status(400).json({
-                        success: false,
-                        error: `Invalid environment "${environment}". Supported environments: testnet, mainnet`
-                    });
-                }
-            }
-
-            // Handle missing table error
-            if (error.code === "42P01" && error.message.includes("user_api_keys")) {
-                try {
-                    console.log('🔧 Creating missing user_api_keys table...');
-                    await this.authMiddleware.dbPoolManager.executeWrite(`
-                        CREATE TABLE user_api_keys (
-                            id SERIAL PRIMARY KEY,
-                            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                            exchange VARCHAR(20) NOT NULL,
-                            api_key TEXT NOT NULL,
-                            api_secret TEXT NOT NULL,
-                            api_passphrase TEXT,
-                            environment VARCHAR(10) DEFAULT 'testnet',
-                            is_active BOOLEAN DEFAULT true,
-                            is_valid BOOLEAN DEFAULT false,
-                            can_read BOOLEAN DEFAULT false,
-                            can_trade BOOLEAN DEFAULT false,
-                            can_withdraw BOOLEAN DEFAULT false,
-                            last_validated_at TIMESTAMP,
-                            validation_error TEXT,
-                            balance_last_check JSONB,
-                            created_at TIMESTAMP DEFAULT NOW(),
-                            updated_at TIMESTAMP DEFAULT NOW()
-                        )
-                    `);
-                    console.log('✅ Successfully created user_api_keys table');
-
-                    // Retry the insert operation
-                    const result = await this.authMiddleware.dbPoolManager.executeWrite(
-                        'INSERT INTO user_api_keys (user_id, exchange, api_key, api_secret, api_passphrase, environment, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-                        [req.user.id, exchange, api_key, api_secret, passphrase || null, environment, true]
-                    );
-
-                    // Also sync to users table for backward compatibility
-                    await this.syncApiKeyToUsersTable(req.user.id, exchange, api_key, api_secret, passphrase, environment);
-
-                    res.json({
-                        success: true,
-                        message: 'API key added successfully (after creating table)',
-                        apiKey: result.rows[0]
-                    });
-                    return;
-
-                } catch (retryError) {
-                    console.error('❌ Failed to create table or retry insert:', retryError);
-                    res.status(500).json({
-                        success: false,
-                        error: 'Database schema issue - could not create table automatically'
-                    });
-                    return;
-                }
-            }
-
-            // Handle missing column error - specifically for passphrase column
-            if (error.code === "42703" && (error.message.includes("passphrase") || error.message.includes("api_passphrase"))) {
-                try {
-                    console.log('🔧 Adding missing api_passphrase column to user_api_keys table...');
-                    await this.authMiddleware.dbPoolManager.executeWrite(
-                        `ALTER TABLE user_api_keys ADD COLUMN api_passphrase TEXT`
-                    );
-                    console.log('✅ Successfully added api_passphrase column');
-
-                    // Retry the insert operation
-                    const result = await this.authMiddleware.dbPoolManager.executeWrite(
-                        'INSERT INTO user_api_keys (user_id, exchange, api_key, api_secret, api_passphrase, environment, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-                        [req.user.id, exchange, api_key, api_secret, passphrase || null, environment, true]
-                    );
-
-                    // Also sync to users table for backward compatibility
-                    await this.syncApiKeyToUsersTable(req.user.id, exchange, api_key, api_secret, passphrase, environment);
-
-                    res.json({
-                        success: true,
-                        message: 'API key added successfully (after schema fix)',
-                        apiKey: result.rows[0]
-                    });
-                    return;
-
-                } catch (retryError) {
-                    console.error('❌ Failed to add column or retry insert:', retryError);
-                    res.status(500).json({
-                        success: false,
-                        error: 'Database schema issue - could not fix automatically'
-                    });
-                    return;
-                }
-            }
-
             res.status(500).json({
                 success: false,
                 error: 'Failed to add API key'
@@ -848,18 +782,25 @@ class UserSettingsRoutes {
     }
 
     /**
-     * DELETE /api-keys/:id - Delete API key
+     * DELETE /api-keys/:id - Delete API key (UPDATED TO USE ENCRYPTION)
      */
     async deleteApiKey(req, res) {
         try {
-            const { id } = req.params;
+            const { id } = req.params; // id is exchange name (bybit, binance)
 
-            const result = await this.authMiddleware.dbPoolManager.executeWrite(
-                'DELETE FROM user_api_keys WHERE id = $1 AND user_id = $2 RETURNING exchange',
-                [id, req.user.id]
-            );
+            if (!this.apiKeyManager) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'API key manager not initialized'
+                });
+            }
 
-            if (result.rows.length === 0) {
+            const exchangeLower = id.toLowerCase();
+
+            // Use encrypted API key manager
+            const result = await this.apiKeyManager.deleteAPIKey(req.user.id, exchangeLower);
+
+            if (!result.success) {
                 return res.status(404).json({
                     success: false,
                     error: 'API key not found'
@@ -868,7 +809,7 @@ class UserSettingsRoutes {
 
             res.json({
                 success: true,
-                message: `${result.rows[0].exchange} API key deleted successfully`
+                message: `${exchangeLower.toUpperCase()} API key deleted successfully`
             });
         } catch (error) {
             console.error('❌ Delete API key error:', error);

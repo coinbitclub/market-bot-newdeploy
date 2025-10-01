@@ -1,0 +1,386 @@
+/**
+ * 🔑 USER API KEY MANAGER
+ * Manages user API keys for Bybit and Binance exchanges
+ *
+ * IMPORTANT: System uses ONLY personal API keys (PERSONAL mode).
+ * No pooled/admin trading - users MUST connect their own exchange accounts.
+ */
+
+const apiKeyEncryption = require('../security/api-key-encryption');
+
+class UserAPIKeyManager {
+    constructor(dbPoolManager) {
+        this.dbPoolManager = dbPoolManager;
+    }
+
+    /**
+     * Save user's API key
+     */
+    async saveAPIKey(userId, exchange, apiKey, apiSecret) {
+        try {
+            // Validate format
+            const validation = apiKeyEncryption.validateAPIKeyFormat(apiKey, exchange);
+            if (!validation.valid) {
+                return {
+                    success: false,
+                    error: validation.error
+                };
+            }
+
+            // Encrypt the API secret
+            const encryptedSecret = apiKeyEncryption.encrypt(apiSecret);
+
+            // Determine column names based on exchange
+            const columns = exchange.toLowerCase() === 'bybit'
+                ? ['bybit_api_key', 'bybit_api_secret_encrypted']
+                : ['binance_api_key', 'binance_api_secret_encrypted'];
+
+            // Update user record
+            await this.dbPoolManager.executeWrite(`
+                UPDATE users
+                SET
+                    ${columns[0]} = $1,
+                    ${columns[1]} = $2,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $3
+            `, [apiKey, encryptedSecret, userId]);
+
+            // Log the action
+            await this.logAPIKeyAction(userId, exchange, 'API_KEY_SAVED', 'SUCCESS');
+
+            console.log(`✅ API key saved for user ${userId} on ${exchange}`);
+
+            return {
+                success: true,
+                message: 'API key saved successfully',
+                masked_key: apiKeyEncryption.maskAPIKey(apiKey)
+            };
+
+        } catch (error) {
+            console.error(`❌ Error saving API key:`, error);
+            await this.logAPIKeyAction(userId, exchange, 'API_KEY_SAVE_FAILED', 'ERROR', error.message);
+            return {
+                success: false,
+                error: 'Failed to save API key'
+            };
+        }
+    }
+
+    /**
+     * Get user's API credentials
+     */
+    async getAPICredentials(userId, exchange) {
+        try {
+            const columns = exchange.toLowerCase() === 'bybit'
+                ? ['bybit_api_key', 'bybit_api_secret_encrypted', 'bybit_api_key_enabled']
+                : ['binance_api_key', 'binance_api_secret_encrypted', 'binance_api_key_enabled'];
+
+            const result = await this.dbPoolManager.executeRead(`
+                SELECT ${columns[0]} as api_key, ${columns[1]} as api_secret_encrypted, ${columns[2]} as enabled
+                FROM users
+                WHERE id = $1
+            `, [userId]);
+
+            if (result.rows.length === 0 || !result.rows[0].api_key) {
+                return {
+                    success: false,
+                    error: 'API key not found'
+                };
+            }
+
+            const row = result.rows[0];
+
+            // Decrypt the API secret
+            const apiSecret = apiKeyEncryption.decrypt(row.api_secret_encrypted);
+
+            return {
+                success: true,
+                apiKey: row.api_key,
+                apiSecret: apiSecret,
+                enabled: row.enabled
+            };
+
+        } catch (error) {
+            console.error(`❌ Error retrieving API key:`, error);
+            return {
+                success: false,
+                error: 'Failed to retrieve API key'
+            };
+        }
+    }
+
+    /**
+     * Verify API key with exchange
+     */
+    async verifyAPIKey(userId, exchange) {
+        try {
+            // Get credentials
+            const credentials = await this.getAPICredentials(userId, exchange);
+            if (!credentials.success) {
+                return credentials;
+            }
+
+            // Create temporary exchange service instance
+            let exchangeService;
+            if (exchange.toLowerCase() === 'bybit') {
+                const BybitService = require('../exchange/bybit-service');
+                exchangeService = new BybitService();
+                // Override with user's credentials
+                exchangeService.apiKey = credentials.apiKey;
+                exchangeService.apiSecret = credentials.apiSecret;
+            } else {
+                const BinanceService = require('../exchange/binance-service');
+                exchangeService = new BinanceService();
+                exchangeService.apiKey = credentials.apiKey;
+                exchangeService.apiSecret = credentials.apiSecret;
+            }
+
+            // Test the API key by fetching account info
+            let testResult;
+            if (exchange.toLowerCase() === 'bybit') {
+                testResult = await exchangeService.getAccountBalance();
+            } else {
+                testResult = await exchangeService.getAccountInfo();
+            }
+
+            if (!testResult || testResult.error) {
+                await this.updateAPIKeyStatus(userId, exchange, false, false);
+                await this.logAPIKeyAction(userId, exchange, 'API_KEY_VERIFICATION_FAILED', 'ERROR');
+                return {
+                    success: false,
+                    error: 'API key verification failed'
+                };
+            }
+
+            // Update verification status
+            await this.updateAPIKeyStatus(userId, exchange, true, true);
+            await this.logAPIKeyAction(userId, exchange, 'API_KEY_VERIFIED', 'SUCCESS');
+
+            // Check permissions
+            const permissions = await this.checkAPIKeyPermissions(exchangeService, exchange);
+
+            // Save permissions
+            await this.saveAPIKeyPermissions(userId, exchange, permissions);
+
+            console.log(`✅ API key verified for user ${userId} on ${exchange}`);
+
+            return {
+                success: true,
+                message: 'API key verified successfully',
+                permissions
+            };
+
+        } catch (error) {
+            console.error(`❌ Error verifying API key:`, error);
+            await this.updateAPIKeyStatus(userId, exchange, false, false);
+            await this.logAPIKeyAction(userId, exchange, 'API_KEY_VERIFICATION_ERROR', 'ERROR', error.message);
+            return {
+                success: false,
+                error: `Verification failed: ${error.message}`
+            };
+        }
+    }
+
+    /**
+     * Check API key permissions on exchange
+     */
+    async checkAPIKeyPermissions(exchangeService, exchange) {
+        try {
+            // Try to get account info to check read permission
+            const accountInfo = exchange.toLowerCase() === 'bybit'
+                ? await exchangeService.getAccountBalance()
+                : await exchangeService.getAccountInfo();
+
+            const permissions = {
+                can_read: !!accountInfo,
+                can_trade: false,
+                can_withdraw: false
+            };
+
+            // Note: Most exchanges don't provide a direct API to check permissions
+            // In production, you might need to parse the account info response
+            // or catch specific error codes when attempting operations
+
+            return permissions;
+
+        } catch (error) {
+            console.error('Error checking permissions:', error);
+            return {
+                can_read: false,
+                can_trade: false,
+                can_withdraw: false
+            };
+        }
+    }
+
+    /**
+     * Update API key verification status
+     */
+    async updateAPIKeyStatus(userId, exchange, enabled, verified) {
+        const columns = exchange.toLowerCase() === 'bybit'
+            ? ['bybit_api_key_enabled', 'bybit_api_key_verified', 'bybit_api_key_verified_at']
+            : ['binance_api_key_enabled', 'binance_api_key_verified', 'binance_api_key_verified_at'];
+
+        await this.dbPoolManager.executeWrite(`
+            UPDATE users
+            SET
+                ${columns[0]} = $1,
+                ${columns[1]} = $2,
+                ${columns[2]} = ${verified ? 'CURRENT_TIMESTAMP' : 'NULL'},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $3
+        `, [enabled, verified, userId]);
+    }
+
+    /**
+     * Save API key permissions
+     */
+    async saveAPIKeyPermissions(userId, exchange, permissions) {
+        await this.dbPoolManager.executeWrite(`
+            INSERT INTO user_api_key_permissions (user_id, exchange, can_trade, can_withdraw, can_read, last_checked_at)
+            VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id, exchange)
+            DO UPDATE SET
+                can_trade = $3,
+                can_withdraw = $4,
+                can_read = $5,
+                last_checked_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+        `, [userId, exchange, permissions.can_trade, permissions.can_withdraw, permissions.can_read]);
+    }
+
+    /**
+     * Delete user's API key
+     */
+    async deleteAPIKey(userId, exchange) {
+        try {
+            const columns = exchange.toLowerCase() === 'bybit'
+                ? ['bybit_api_key', 'bybit_api_secret_encrypted', 'bybit_api_key_enabled', 'bybit_api_key_verified']
+                : ['binance_api_key', 'binance_api_secret_encrypted', 'binance_api_key_enabled', 'binance_api_key_verified'];
+
+            await this.dbPoolManager.executeWrite(`
+                UPDATE users
+                SET
+                    ${columns[0]} = NULL,
+                    ${columns[1]} = NULL,
+                    ${columns[2]} = FALSE,
+                    ${columns[3]} = FALSE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $1
+            `, [userId]);
+
+            await this.logAPIKeyAction(userId, exchange, 'API_KEY_DELETED', 'SUCCESS');
+
+            console.log(`✅ API key deleted for user ${userId} on ${exchange}`);
+
+            return {
+                success: true,
+                message: 'API key deleted successfully'
+            };
+
+        } catch (error) {
+            console.error(`❌ Error deleting API key:`, error);
+            return {
+                success: false,
+                error: 'Failed to delete API key'
+            };
+        }
+    }
+
+    /**
+     * Get user's API key status
+     */
+    async getAPIKeyStatus(userId, exchange) {
+        try {
+            const columns = exchange.toLowerCase() === 'bybit'
+                ? ['bybit_api_key', 'bybit_api_key_enabled', 'bybit_api_key_verified', 'bybit_api_key_verified_at']
+                : ['binance_api_key', 'binance_api_key_enabled', 'binance_api_key_verified', 'binance_api_key_verified_at'];
+
+            const result = await this.dbPoolManager.executeRead(`
+                SELECT
+                    ${columns[0]} as api_key,
+                    ${columns[1]} as enabled,
+                    ${columns[2]} as verified,
+                    ${columns[3]} as verified_at
+                FROM users
+                WHERE id = $1
+            `, [userId]);
+
+            if (result.rows.length === 0) {
+                return {
+                    success: false,
+                    error: 'User not found'
+                };
+            }
+
+            const row = result.rows[0];
+
+            return {
+                success: true,
+                has_key: !!row.api_key,
+                masked_key: row.api_key ? apiKeyEncryption.maskAPIKey(row.api_key) : null,
+                enabled: row.enabled,
+                verified: row.verified,
+                verified_at: row.verified_at
+            };
+
+        } catch (error) {
+            console.error(`❌ Error getting API key status:`, error);
+            return {
+                success: false,
+                error: 'Failed to get API key status'
+            };
+        }
+    }
+
+    /**
+     * Set user's trading mode (PERSONAL only - no pooled/hybrid modes)
+     */
+    async setTradingMode(userId, mode) {
+        try {
+            // System only supports PERSONAL mode (users must use their own API keys)
+            if (mode !== 'PERSONAL') {
+                return {
+                    success: false,
+                    error: 'Only PERSONAL trading mode is supported. Users must connect their own Bybit/Binance API keys.'
+                };
+            }
+
+            await this.dbPoolManager.executeWrite(`
+                UPDATE users
+                SET trading_mode = $1, updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2
+            `, [mode, userId]);
+
+            await this.logAPIKeyAction(userId, 'SYSTEM', `TRADING_MODE_SET_${mode}`, 'SUCCESS');
+
+            return {
+                success: true,
+                message: `Trading mode set to ${mode}`
+            };
+
+        } catch (error) {
+            console.error(`❌ Error setting trading mode:`, error);
+            return {
+                success: false,
+                error: 'Failed to set trading mode'
+            };
+        }
+    }
+
+    /**
+     * Log API key action for audit
+     */
+    async logAPIKeyAction(userId, exchange, action, status, details = null) {
+        try {
+            await this.dbPoolManager.executeWrite(`
+                INSERT INTO user_api_keys_audit (user_id, exchange, action, status, details)
+                VALUES ($1, $2, $3, $4, $5)
+            `, [userId, exchange, action, status, details]);
+        } catch (error) {
+            console.error('Error logging API key action:', error);
+        }
+    }
+}
+
+module.exports = UserAPIKeyManager;

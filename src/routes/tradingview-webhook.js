@@ -1,6 +1,9 @@
 /**
  * 📊 TRADINGVIEW WEBHOOK ROUTES
  * Handles incoming webhook signals from TradingView for production trading
+ *
+ * IMPORTANT: Uses ONLY personal API keys - no admin/pooled trading.
+ * Users must have their own Bybit/Binance API keys configured.
  */
 
 const express = require('express');
@@ -8,7 +11,7 @@ const express = require('express');
 class TradingViewWebhookRoutes {
     constructor() {
         this.router = express.Router();
-        this.balanceTradingEngine = null; // Will be initialized when DB is set
+        this.personalTradingEngine = null; // Will be initialized when DB is set
         this.setupRoutes();
     }
 
@@ -17,8 +20,8 @@ class TradingViewWebhookRoutes {
      */
     setDbPoolManager(dbPoolManager) {
         // Import here to avoid circular dependency
-        const BalanceTradingEngine = require('../trading/balance-based/balance-trading-engine');
-        this.balanceTradingEngine = new BalanceTradingEngine(dbPoolManager);
+        const PersonalTradingEngine = require('../trading/personal-api/personal-trading-engine');
+        this.personalTradingEngine = new PersonalTradingEngine(dbPoolManager);
     }
 
     setupRoutes() {
@@ -65,9 +68,9 @@ class TradingViewWebhookRoutes {
             // Parse TradingView signal into standard format
             const signal = this.parseWebhookToSignal(webhookData);
 
-            // Check if balance trading engine is initialized
-            if (!this.balanceTradingEngine) {
-                console.log('⚠️ Balance trading engine not initialized, storing signal for later processing');
+            // Check if personal trading engine is initialized
+            if (!this.personalTradingEngine) {
+                console.log('⚠️ Personal trading engine not initialized, storing signal for later processing');
 
                 // In production, you might queue this signal for later processing
                 return res.json({
@@ -79,9 +82,9 @@ class TradingViewWebhookRoutes {
                 });
             }
 
-            // Process signal through balance trading engine
-            console.log('📊 Processing TradingView signal through balance trading engine...');
-            const executionResult = await this.balanceTradingEngine.processSignalForAllUsers(signal);
+            // Process signal through personal trading engine (users' own API keys)
+            console.log('🔑 Processing TradingView signal through personal API key trading engine...');
+            const executionResult = await this.personalTradingEngine.processSignalForAllUsers(signal);
 
             // Enhanced response for TradingView
             const response = {
@@ -93,7 +96,8 @@ class TradingViewWebhookRoutes {
                     signal: signal
                 },
                 execution: {
-                    engine: 'balance-based',
+                    engine: 'personal-api-keys',
+                    mode: 'PERSONAL',
                     total_users: executionResult.totalUsers,
                     executed_trades: executionResult.executedTrades?.length || 0,
                     ai_decision: executionResult.aiDecision?.action || 'UNKNOWN',
@@ -250,7 +254,10 @@ class TradingViewWebhookRoutes {
         try {
             const status = {
                 webhook_active: true,
-                trading_engine_ready: this.balanceTradingEngine !== null,
+                trading_engine_ready: this.personalTradingEngine !== null,
+                trading_mode: 'PERSONAL',
+                engine: 'personal-api-keys',
+                note: 'Users must have their own Bybit/Binance API keys configured',
                 supported_actions: ['BUY', 'SELL', 'buy', 'sell'],
                 supported_symbols: ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'MATICUSDT', 'DOTUSDT'],
                 required_fields: ['action', 'symbol'],
