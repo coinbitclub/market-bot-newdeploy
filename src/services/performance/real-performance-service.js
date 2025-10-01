@@ -29,9 +29,17 @@ class RealPerformanceService {
                                 process.env.DB_URL;
         
         if (connectionString) {
+            // Auto-detect if SSL is needed based on connection string or environment
+            const needsSSL = process.env.NODE_ENV === 'production' || 
+                           connectionString.includes('sslmode=require') ||
+                           connectionString.includes('railway.app') ||
+                           connectionString.includes('render.com') ||
+                           connectionString.includes('supabase.co') ||
+                           connectionString.includes('heroku.com');
+            
             return {
                 connectionString,
-                ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+                ssl: needsSSL ? { rejectUnauthorized: false } : false,
                 max: 10,
                 idleTimeoutMillis: 30000,
                 connectionTimeoutMillis: 5000
@@ -46,13 +54,21 @@ class RealPerformanceService {
         const password = process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD;
 
         if (host && port && database && user && password) {
+            // Auto-detect if SSL is needed based on host or environment
+            const needsSSL = process.env.NODE_ENV === 'production' || 
+                           host.includes('railway.app') ||
+                           host.includes('render.com') ||
+                           host.includes('supabase.co') ||
+                           host.includes('heroku.com') ||
+                           process.env.DB_SSL === 'true';
+            
             return {
                 host,
                 port: parseInt(port),
                 database,
                 user,
                 password,
-                ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+                ssl: needsSSL ? { rejectUnauthorized: false } : false,
                 max: 10,
                 idleTimeoutMillis: 30000,
                 connectionTimeoutMillis: 5000
