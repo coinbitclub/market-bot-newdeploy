@@ -7,20 +7,26 @@
  */
 
 const express = require('express');
+const AuthMiddleware = require('../middleware/auth');
 const UserAPIKeyManager = require('../services/user-api-keys/user-api-key-manager');
 
 class UserAPIKeysRoutes {
     constructor() {
         this.router = express.Router();
+        this.authMiddleware = new AuthMiddleware();
         this.apiKeyManager = null;
         this.setupRoutes();
     }
 
     setDbPoolManager(dbPoolManager) {
+        this.authMiddleware.setDbPoolManager(dbPoolManager);
         this.apiKeyManager = new UserAPIKeyManager(dbPoolManager);
     }
 
     setupRoutes() {
+        // All routes require authentication
+        this.router.use(this.authMiddleware.authenticate.bind(this.authMiddleware));
+
         // Get API key status for an exchange
         this.router.get('/:exchange/status', this.getAPIKeyStatus.bind(this));
 

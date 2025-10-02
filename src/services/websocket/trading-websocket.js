@@ -343,6 +343,182 @@ class TradingWebSocket {
     }
 
     /**
+     * Broadcast new operation to user (real-time)
+     */
+    broadcastNewOperation(userId, operation) {
+        if (!this.isInitialized) return;
+
+        const operationData = {
+            type: 'new_operation',
+            data: {
+                id: operation.id || operation.operation_id,
+                pair: operation.trading_pair || operation.pair,
+                direction: operation.operation_type || operation.direction,
+                entryPrice: operation.entry_price,
+                quantity: operation.quantity,
+                status: operation.status,
+                timestamp: operation.entry_time || new Date().toISOString()
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        this.io.to(`user_${userId}`).emit('new_operation', operationData);
+        console.log(`📊 New operation broadcasted to user ${userId}: ${operation.trading_pair}`);
+    }
+
+    /**
+     * Broadcast operation update to user (price changes, P&L updates)
+     */
+    broadcastOperationUpdate(userId, operation) {
+        if (!this.isInitialized) return;
+
+        const updateData = {
+            type: 'operation_update',
+            data: {
+                id: operation.id || operation.operation_id,
+                currentPrice: operation.current_price || operation.exit_price,
+                pnl: operation.profit_loss_usd || operation.pnl,
+                pnlPercent: operation.profit_loss_percentage || operation.pnlPercent,
+                status: operation.status,
+                timestamp: new Date().toISOString()
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        this.io.to(`user_${userId}`).emit('operation_update', updateData);
+        console.log(`📈 Operation update broadcasted to user ${userId}: ${operation.id}`);
+    }
+
+    /**
+     * Broadcast operation closed to user
+     */
+    broadcastOperationClosed(userId, operation) {
+        if (!this.isInitialized) return;
+
+        const closedData = {
+            type: 'operation_closed',
+            data: {
+                id: operation.id || operation.operation_id,
+                pair: operation.trading_pair || operation.pair,
+                entryPrice: operation.entry_price,
+                exitPrice: operation.exit_price,
+                pnl: operation.profit_loss_usd || operation.pnl,
+                pnlPercent: operation.profit_loss_percentage || operation.pnlPercent,
+                duration: operation.duration_minutes,
+                timestamp: new Date().toISOString()
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        this.io.to(`user_${userId}`).emit('operation_closed', closedData);
+        console.log(`✅ Operation closed broadcasted to user ${userId}: P&L ${operation.profit_loss_usd}`);
+    }
+
+    /**
+     * Broadcast performance update to user
+     */
+    broadcastPerformanceUpdate(userId, performance) {
+        if (!this.isInitialized) return;
+
+        const perfData = {
+            type: 'performance_update',
+            data: {
+                todayOperations: performance.today_operations || performance.operationsToday,
+                todayProfitLoss: performance.today_profit_loss || performance.todayReturnUSD,
+                todayWinRate: performance.today_win_rate || performance.successRate,
+                totalOperations: performance.total_operations,
+                totalProfitLoss: performance.total_profit_loss_usd,
+                overallWinRate: performance.overall_win_rate,
+                timestamp: new Date().toISOString()
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        this.io.to(`user_${userId}`).emit('performance_update', perfData);
+        console.log(`📊 Performance update broadcasted to user ${userId}`);
+    }
+
+    /**
+     * Broadcast all operations data (batch update)
+     */
+    broadcastOperationsData(userId, data) {
+        if (!this.isInitialized) return;
+
+        const opsData = {
+            type: 'operations_data',
+            data: {
+                signals: data.signals || [],
+                positions: data.positions || [],
+                dailyStats: data.dailyStats || {},
+                timestamp: new Date().toISOString()
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        this.io.to(`user_${userId}`).emit('operations_data', opsData);
+        console.log(`📡 Operations data broadcasted to user ${userId}: ${data.signals?.length || 0} signals, ${data.positions?.length || 0} positions`);
+    }
+
+    /**
+     * Broadcast new TradingView signal to ALL users (real-time)
+     * This is called when TradingView webhook receives a signal
+     */
+    broadcastTradingSignal(signal) {
+        if (!this.isInitialized) {
+            console.warn('⚠️ WebSocket not initialized, cannot broadcast signal');
+            return;
+        }
+
+        const signalData = {
+            type: 'trading_signal',
+            data: {
+                id: `SIGNAL_${Date.now()}`,
+                pair: signal.symbol || signal.pair,
+                direction: signal.action || signal.direction,
+                price: signal.price,
+                quantity: signal.quantity,
+                strategy: signal.strategy || signal.alert_name || 'TradingView Signal',
+                source: 'TRADINGVIEW',
+                confidence: 85, // Default confidence for TradingView signals
+                timestamp: new Date().toISOString(),
+                // Additional metadata
+                interval: signal.interval || signal.timeframe,
+                stop_loss: signal.stop_loss,
+                take_profit: signal.take_profit
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        // Broadcast to ALL connected clients (not just specific user)
+        this.io.emit('trading_signal', signalData);
+
+        console.log(`📊 TradingView signal broadcasted to ALL users: ${signal.symbol} ${signal.action} @ ${signal.price || 'market'}`);
+    }
+
+    /**
+     * Broadcast signal received event (for monitoring/analytics)
+     */
+    broadcastSignalReceived(signal) {
+        if (!this.isInitialized) return;
+
+        const signalReceivedData = {
+            type: 'signal_received',
+            data: {
+                symbol: signal.symbol,
+                action: signal.action,
+                source: signal.source || 'TRADINGVIEW',
+                timestamp: new Date().toISOString()
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        // Broadcast to all connected clients
+        this.io.emit('signal_received', signalReceivedData);
+
+        console.log(`📡 Signal received event broadcasted: ${signal.symbol} ${signal.action}`);
+    }
+
+    /**
      * Get connection statistics
      */
     getConnectionStats() {

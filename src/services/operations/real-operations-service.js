@@ -4,12 +4,13 @@
  */
 
 const { Pool } = require('pg');
+const BinanceService = require('../exchange/binance-service');
 
 class RealOperationsService {
     constructor() {
         // FIXED: Use proper database configuration with fallback to mock mode
         const dbConfig = this.getDatabaseConfig();
-        
+
         if (dbConfig) {
             this.pool = new Pool(dbConfig);
             console.log('✅ RealOperationsService: Database connection configured');
@@ -17,6 +18,10 @@ class RealOperationsService {
             this.pool = null;
             console.log('⚠️ RealOperationsService: No database config, using mock mode');
         }
+
+        // Initialize exchange service for real-time prices
+        this.binanceService = new BinanceService();
+        console.log('✅ RealOperationsService: Binance service initialized for real-time data');
     }
 
     /**
@@ -80,60 +85,80 @@ class RealOperationsService {
     }
 
     /**
-     * Get real market indicators
+     * Get real market indicators from external APIs
      */
     async getMarketIndicators() {
         try {
-            // In a real implementation, these would come from external APIs
-            // For now, we'll simulate realistic market data
-            
-            // Get current time for realistic fluctuations
-            const now = new Date();
-            const hour = now.getHours();
-            const minute = now.getMinutes();
-            
-            // Simulate market hours (more volatile during active hours)
-            const isMarketHours = hour >= 8 && hour <= 22;
-            const volatility = isMarketHours ? 0.8 : 0.3;
-            
-            // Fear & Greed Index simulation (0-100)
-            const baseFearGreed = 45;
-            const fearGreedVariation = (Math.sin(Date.now() / 1000000) * 20) + (Math.random() - 0.5) * 10;
-            const fearAndGreed = Math.max(0, Math.min(100, baseFearGreed + fearGreedVariation));
-            
-            // Determine fear & greed status
-            let fearAndGreedStatus;
-            if (fearAndGreed <= 25) fearAndGreedStatus = 'EXTREME_FEAR';
-            else if (fearAndGreed <= 45) fearAndGreedStatus = 'FEAR';
-            else if (fearAndGreed <= 55) fearAndGreedStatus = 'NEUTRAL';
-            else if (fearAndGreed <= 75) fearAndGreedStatus = 'GREED';
-            else fearAndGreedStatus = 'EXTREME_GREED';
-            
-            // BTC Dominance simulation (40-70%)
-            const baseDominance = 56.8;
-            const dominanceVariation = (Math.sin(Date.now() / 2000000) * 2) + (Math.random() - 0.5) * 1;
-            const btcDominance = Math.max(40, Math.min(70, baseDominance + dominanceVariation));
-            
-            // Long/Short ratio simulation
-            const baseLong = 62.3;
-            const baseShort = 37.7;
-            const longVariation = (Math.random() - 0.5) * 5;
-            const shortVariation = (Math.random() - 0.5) * 5;
-            
+            const axios = require('axios');
+            let fearAndGreed = 50;
+            let fearAndGreedStatus = 'NEUTRAL';
+
+            // Try to get real Fear & Greed Index from Alternative.me API
+            try {
+                const fgResponse = await axios.get('https://api.alternative.me/fng/?limit=1', {
+                    timeout: 5000
+                });
+
+                if (fgResponse.data && fgResponse.data.data && fgResponse.data.data[0]) {
+                    const fgData = fgResponse.data.data[0];
+                    fearAndGreed = parseInt(fgData.value);
+
+                    // Map classification
+                    if (fearAndGreed <= 25) fearAndGreedStatus = 'EXTREME_FEAR';
+                    else if (fearAndGreed <= 45) fearAndGreedStatus = 'FEAR';
+                    else if (fearAndGreed <= 55) fearAndGreedStatus = 'NEUTRAL';
+                    else if (fearAndGreed <= 75) fearAndGreedStatus = 'GREED';
+                    else fearAndGreedStatus = 'EXTREME_GREED';
+
+                    console.log(`✅ Real Fear & Greed Index: ${fearAndGreed} (${fearAndGreedStatus})`);
+                }
+            } catch (fgError) {
+                console.warn('⚠️ Could not fetch Fear & Greed Index, using default:', fgError.message);
+            }
+
+            // Try to get BTC Dominance from CoinGecko API (free, no key required)
+            let btcDominance = 48.5;
+            try {
+                const dominanceResponse = await axios.get('https://api.coingecko.com/api/v3/global', {
+                    timeout: 5000
+                });
+
+                if (dominanceResponse.data && dominanceResponse.data.data) {
+                    btcDominance = dominanceResponse.data.data.market_cap_percentage.btc || 48.5;
+                    console.log(`✅ Real BTC Dominance: ${btcDominance}%`);
+                }
+            } catch (domError) {
+                console.warn('⚠️ Could not fetch BTC Dominance, using default:', domError.message);
+            }
+
+            // Long/Short ratio - use default as this requires paid API
+            const baseLong = 52;
+            const baseShort = 48;
+
             return {
                 fearAndGreed: Math.round(fearAndGreed * 10) / 10,
                 fearAndGreedStatus,
                 btcDominance: Math.round(btcDominance * 10) / 10,
                 top100LongShort: {
-                    long: Math.max(30, Math.min(80, baseLong + longVariation)),
-                    short: Math.max(20, Math.min(70, baseShort + shortVariation))
+                    long: baseLong,
+                    short: baseShort
                 },
-                lastUpdate: now
+                lastUpdate: new Date()
             };
-            
+
         } catch (error) {
             console.error('❌ Error getting market indicators:', error);
-            throw error;
+            // Return safe defaults if everything fails
+            return {
+                fearAndGreed: 50,
+                fearAndGreedStatus: 'NEUTRAL',
+                btcDominance: 48.5,
+                top100LongShort: {
+                    long: 52,
+                    short: 48
+                },
+                lastUpdate: new Date()
+            };
         }
     }
 
@@ -208,270 +233,388 @@ class RealOperationsService {
     }
 
     /**
-     * Get real trading signals from database
+     * Get trading signals from database (recent operations)
      */
     async getTradingSignals(userId, limit = 20) {
         try {
-            // FIXED: Check if database connection is available
+            console.log(`📡 Fetching trading signals for user ${userId} from database...`);
+
             if (!this.pool) {
-                console.log('⚠️ No database connection, returning mock signals');
-                return this.getMockSignals();
+                console.log('⚠️ No database connection, returning empty signals');
+                return [];
             }
 
+            // Query recent operations from trading_operations table
             const result = await this.pool.query(`
-                SELECT 
+                SELECT
                     id,
+                    operation_id as id,
                     trading_pair as pair,
                     operation_type as direction,
-                    confidence_score as confidence,
+                    COALESCE(confidence_score, 85) as confidence,
+                    entry_price as "entryPrice",
+                    COALESCE(exit_price, entry_price) as "currentPrice",
+                    quantity,
+                    COALESCE(profit_loss_usd, 0) as pnl,
+                    COALESCE(profit_loss_percentage, 0) as "pnlPercent",
                     entry_time as timestamp,
                     status,
                     reasoning,
-                    signal_source
-                FROM trading_operations 
-                WHERE user_id = $1 
-                ORDER BY entry_time DESC 
+                    signal_source as source
+                FROM trading_operations
+                WHERE user_id = $1
+                ORDER BY entry_time DESC
                 LIMIT $2
             `, [userId, limit]);
 
-            return result.rows.map(row => ({
-                id: row.id.toString(),
-                pair: row.pair,
-                direction: row.direction,
-                strength: Math.round(row.confidence || 0),
-                confidence: parseFloat(row.confidence || 0),
-                timestamp: row.timestamp,
-                status: this.mapOperationStatus(row.status),
-                reasoning: row.reasoning || 'Signal generated from market analysis',
-                source: row.signal_source || 'AI'
-            }));
+            const signals = result.rows.map(row => {
+                // Determine status based on operation status
+                let signalStatus = 'PROCESSANDO';
+                if (row.status === 'OPEN') {
+                    signalStatus = 'EXECUTADO';
+                } else if (row.status === 'CLOSED') {
+                    signalStatus = parseFloat(row.pnl) > 0 ? 'APROVADO' : 'DESCARTADO';
+                }
+
+                return {
+                    id: row.id,
+                    pair: row.pair,
+                    direction: row.direction,
+                    strength: parseInt(row.confidence) || 0,
+                    confidence: parseInt(row.confidence) || 0,
+                    entryPrice: parseFloat(row.entryPrice),
+                    currentPrice: parseFloat(row.currentPrice),
+                    quantity: parseFloat(row.quantity) || 0,
+                    pnl: parseFloat(row.pnl) || 0,
+                    pnlPercent: parseFloat(row.pnlPercent) || 0,
+                    timestamp: row.timestamp,
+                    status: signalStatus,
+                    reasoning: row.reasoning || 'Operação em andamento',
+                    source: row.source || 'TRADING_BOT'
+                };
+            });
+
+            console.log(`✅ Fetched ${signals.length} trading signals from database`);
+            return signals;
 
         } catch (error) {
-            // Handle specific database errors
-            if (error.code === '42P01') {
-                console.log('⚠️ Table "trading_operations" does not exist, using mock signals');
-            } else {
-                console.error('❌ Error getting trading signals:', error);
-            }
-            // Fallback to mock signals if database fails
-            return this.getMockSignals();
+            console.error('❌ Error fetching trading signals from database:', error);
+            return [];
         }
     }
 
     /**
-     * Get real positions from database
+     * Get real-time positions with live market prices from database
      */
     async getPositions(userId) {
         try {
-            // FIXED: Check if database connection is available
+            console.log(`📡 Fetching OPEN positions for user ${userId} from database...`);
+
             if (!this.pool) {
-                console.log('⚠️ No database connection, returning mock positions');
-                return this.getMockPositions();
+                console.log('⚠️ No database connection, returning empty positions');
+                return [];
             }
 
+            // Query OPEN positions from trading_operations table
             const result = await this.pool.query(`
-                SELECT 
+                SELECT
                     id,
+                    operation_id as id,
                     trading_pair as pair,
                     operation_type as type,
-                    entry_price,
-                    exit_price,
+                    entry_price as "entryPrice",
                     quantity,
-                    profit_loss_usd as pnl,
-                    profit_loss_percentage as pnlPercent,
                     status,
                     entry_time as timestamp,
-                    stop_loss,
-                    take_profit
-                FROM trading_operations 
-                WHERE user_id = $1 
-                    AND status = 'OPEN'
+                    COALESCE(stop_loss, entry_price * 0.95) as "stopLoss",
+                    COALESCE(take_profit, entry_price * 1.05) as "takeProfit"
+                FROM trading_operations
+                WHERE user_id = $1
+                AND status = 'OPEN'
                 ORDER BY entry_time DESC
+                LIMIT 50
             `, [userId]);
 
-            return result.rows.map(row => ({
-                id: row.id.toString(),
-                pair: row.pair,
-                type: row.type,
-                entryPrice: parseFloat(row.entry_price || 0),
-                currentPrice: parseFloat(row.exit_price || row.entry_price || 0), // Use entry price as current if no exit price
-                quantity: parseFloat(row.quantity || 0),
-                pnl: parseFloat(row.pnl || 0),
-                pnlPercent: parseFloat(row.pnlPercent || 0),
-                status: 'OPEN',
-                timestamp: row.timestamp,
-                stopLoss: row.stop_loss ? parseFloat(row.stop_loss) : undefined,
-                takeProfit: row.take_profit ? parseFloat(row.take_profit) : undefined
-            }));
+            const positions = [];
+
+            // Enrich each position with current price and calculate real-time P&L
+            for (const row of result.rows) {
+                try {
+                    // Get real-time current price
+                    const priceData = await this.binanceService.getSymbolPrice(row.pair);
+
+                    if (priceData.success) {
+                        const currentPrice = priceData.price;
+
+                        // Calculate real-time P&L
+                        const priceDiff = currentPrice - row.entryPrice;
+                        const pnlPercent = (priceDiff / row.entryPrice) * 100;
+                        const pnl = priceDiff * row.quantity;
+
+                        positions.push({
+                            id: row.id,
+                            pair: row.pair,
+                            type: row.type,
+                            entryPrice: parseFloat(row.entryPrice),
+                            currentPrice: currentPrice,
+                            quantity: parseFloat(row.quantity),
+                            pnl: pnl,
+                            pnlPercent: pnlPercent,
+                            status: row.status,
+                            timestamp: row.timestamp,
+                            stopLoss: parseFloat(row.stopLoss),
+                            takeProfit: parseFloat(row.takeProfit)
+                        });
+                    } else {
+                        // If can't get current price, use entry price
+                        positions.push({
+                            id: row.id,
+                            pair: row.pair,
+                            type: row.type,
+                            entryPrice: parseFloat(row.entryPrice),
+                            currentPrice: parseFloat(row.entryPrice),
+                            quantity: parseFloat(row.quantity),
+                            pnl: 0,
+                            pnlPercent: 0,
+                            status: row.status,
+                            timestamp: row.timestamp,
+                            stopLoss: parseFloat(row.stopLoss),
+                            takeProfit: parseFloat(row.takeProfit)
+                        });
+                    }
+                } catch (priceError) {
+                    console.error(`Error fetching price for ${row.pair}:`, priceError.message);
+                }
+            }
+
+            console.log(`✅ Fetched ${positions.length} OPEN positions from database`);
+            return positions;
 
         } catch (error) {
-            // Handle specific database errors
-            if (error.code === '42P01') {
-                console.log('⚠️ Table "trading_operations" does not exist, using mock positions');
-            } else {
-                console.error('❌ Error getting positions:', error);
-            }
-            // Fallback to mock positions if database fails
-            return this.getMockPositions();
+            console.error('❌ Error fetching positions from database:', error);
+            return [];
         }
     }
 
     /**
-     * Get daily statistics from database
+     * Get real-time daily statistics from database
      */
     async getDailyStats(userId) {
         try {
-            // FIXED: Check if database connection is available
+            console.log(`📡 Fetching daily stats for user ${userId} from database...`);
+
             if (!this.pool) {
-                console.log('⚠️ No database connection, returning mock daily stats');
-                return this.getMockDailyStats();
+                console.log('⚠️ No database connection, returning default stats');
+                return {
+                    operationsToday: 0,
+                    successRate: 0,
+                    historicalSuccessRate: 0,
+                    todayReturnUSD: 0,
+                    todayReturnPercent: 0,
+                    totalInvested: 10000
+                };
             }
 
-            // Get today's operations
+            // First, try to get from user_performance_cache table
+            const cacheResult = await this.pool.query(`
+                SELECT
+                    today_operations,
+                    today_profit_loss,
+                    today_win_rate,
+                    total_operations,
+                    total_profit_loss_usd,
+                    overall_win_rate,
+                    last_updated
+                FROM user_performance_cache
+                WHERE user_id = $1
+            `, [userId]);
+
+            if (cacheResult.rows.length > 0) {
+                const cache = cacheResult.rows[0];
+
+                // Calculate today's return percentage
+                const totalInvested = 10000; // Default investment
+                const todayReturnPercent = totalInvested > 0
+                    ? (parseFloat(cache.today_profit_loss || 0) / totalInvested) * 100
+                    : 0;
+
+                console.log(`✅ Fetched daily stats from cache for user ${userId}`);
+                return {
+                    operationsToday: parseInt(cache.today_operations || 0),
+                    successRate: parseFloat(cache.today_win_rate || 0),
+                    historicalSuccessRate: parseFloat(cache.overall_win_rate || 0),
+                    todayReturnUSD: parseFloat(cache.today_profit_loss || 0),
+                    todayReturnPercent: todayReturnPercent,
+                    totalInvested: totalInvested
+                };
+            }
+
+            // If no cache, calculate from trading_operations directly
+            console.log('⚠️ No cache found, calculating from trading_operations...');
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
             const todayResult = await this.pool.query(`
-                SELECT 
+                SELECT
+                    COUNT(*) as operations_count,
+                    COUNT(CASE WHEN profit_loss_usd > 0 THEN 1 END) as winning_ops,
+                    COALESCE(SUM(profit_loss_usd), 0) as total_pnl
+                FROM trading_operations
+                WHERE user_id = $1
+                AND entry_time >= $2
+                AND status = 'CLOSED'
+            `, [userId, today]);
+
+            const allTimeResult = await this.pool.query(`
+                SELECT
                     COUNT(*) as total_operations,
-                    COUNT(CASE WHEN profit_loss_usd > 0 THEN 1 END) as winning_operations,
-                    COUNT(CASE WHEN profit_loss_usd < 0 THEN 1 END) as losing_operations,
-                    COALESCE(SUM(profit_loss_usd), 0) as total_profit_loss,
-                    COALESCE(AVG(profit_loss_percentage), 0) as avg_return_percent
-                FROM trading_operations 
-                WHERE user_id = $1 
-                    AND DATE(entry_time) = CURRENT_DATE
-                    AND status = 'CLOSED'
+                    COUNT(CASE WHEN profit_loss_usd > 0 THEN 1 END) as total_winning,
+                    COALESCE(SUM(profit_loss_usd), 0) as total_pnl
+                FROM trading_operations
+                WHERE user_id = $1
+                AND status = 'CLOSED'
             `, [userId]);
 
-            // Get historical success rate
-            const historicalResult = await this.pool.query(`
-                SELECT 
-                    COUNT(*) as total_operations,
-                    COUNT(CASE WHEN profit_loss_usd > 0 THEN 1 END) as winning_operations
-                FROM trading_operations 
-                WHERE user_id = $1 
-                    AND status = 'CLOSED'
-            `, [userId]);
+            const todayData = todayResult.rows[0];
+            const allTimeData = allTimeResult.rows[0];
 
-            // Get total invested (from user balance)
-            const userResult = await this.pool.query(`
-                SELECT balance_real_usd 
-                FROM users 
-                WHERE id = $1
-            `, [userId]);
+            const operationsToday = parseInt(todayData.operations_count || 0);
+            const winningToday = parseInt(todayData.winning_ops || 0);
+            const todayPnL = parseFloat(todayData.total_pnl || 0);
 
-            const today = todayResult.rows[0];
-            const historical = historicalResult.rows[0];
-            const user = userResult.rows[0];
+            const totalOperations = parseInt(allTimeData.total_operations || 0);
+            const totalWinning = parseInt(allTimeData.total_winning || 0);
 
-            const operationsToday = parseInt(today.total_operations || 0);
-            const winningToday = parseInt(today.winning_operations || 0);
-            const successRate = operationsToday > 0 ? (winningToday / operationsToday) * 100 : 0;
-            
-            const totalHistorical = parseInt(historical.total_operations || 0);
-            const winningHistorical = parseInt(historical.winning_operations || 0);
-            const historicalSuccessRate = totalHistorical > 0 ? (winningHistorical / totalHistorical) * 100 : 0;
+            const todaySuccessRate = operationsToday > 0 ? (winningToday / operationsToday) * 100 : 0;
+            const overallSuccessRate = totalOperations > 0 ? (totalWinning / totalOperations) * 100 : 0;
 
+            const totalInvested = 10000;
+            const todayReturnPercent = totalInvested > 0 ? (todayPnL / totalInvested) * 100 : 0;
+
+            console.log(`✅ Calculated daily stats from operations for user ${userId}`);
             return {
                 operationsToday,
-                successRate: Math.round(successRate * 10) / 10,
-                historicalSuccessRate: Math.round(historicalSuccessRate * 10) / 10,
-                todayReturnUSD: parseFloat(today.total_profit_loss || 0),
-                todayReturnPercent: parseFloat(today.avg_return_percent || 0),
-                totalInvested: parseFloat(user?.balance_real_usd || 10000)
+                successRate: Math.round(todaySuccessRate * 10) / 10,
+                historicalSuccessRate: Math.round(overallSuccessRate * 10) / 10,
+                todayReturnUSD: Math.round(todayPnL * 100) / 100,
+                todayReturnPercent: Math.round(todayReturnPercent * 100) / 100,
+                totalInvested: totalInvested
             };
 
         } catch (error) {
-            // Handle specific database errors
-            if (error.code === '42P01') {
-                console.log('⚠️ Table "trading_operations" does not exist, using mock daily stats');
-            } else {
-                console.error('❌ Error getting daily stats:', error);
-            }
-            // Fallback to mock daily stats if database fails
-            return this.getMockDailyStats();
+            console.error('❌ Error fetching daily stats from database:', error);
+            return {
+                operationsToday: 0,
+                successRate: 0,
+                historicalSuccessRate: 0,
+                todayReturnUSD: 0,
+                todayReturnPercent: 0,
+                totalInvested: 10000
+            };
         }
     }
 
     /**
-     * Get top 10 process signals based on performance and activity
+     * Get top 10 TradingView signals from database
+     * These are raw signals from TradingView webhooks (not executed trades)
      */
     async getTopProcessSignals() {
         try {
-            // FIXED: Check if database connection is available
+            console.log('📡 Fetching top 10 TradingView signals from database...');
+
             if (!this.pool) {
-                console.log('⚠️ No database connection, returning demo signals');
-                return this.generateDemoTopSignals();
+                console.log('⚠️ No database connection, returning empty top signals');
+                return [];
             }
 
-            // Get the most active and successful signals from the last 24 hours
+            // Query trading_signals table (TradingView webhook alerts)
             const result = await this.pool.query(`
                 SELECT
-                    ROW_NUMBER() OVER (ORDER BY
-                        (CASE WHEN profit_loss_usd > 0 THEN 1 ELSE 0 END) DESC,
-                        ABS(profit_loss_percentage) DESC,
-                        entry_time DESC
-                    ) as ranking,
-                    id,
-                    trading_pair as pair,
-                    operation_type as direction,
-                    confidence_score as confidence,
-                    entry_price,
-                    exit_price,
-                    quantity,
-                    profit_loss_usd as pnl,
-                    profit_loss_percentage as pnlPercent,
-                    status,
-                    entry_time as timestamp,
-                    reasoning,
-                    signal_source,
-                    stop_loss,
-                    take_profit,
-                    user_id
-                FROM trading_operations
-                WHERE entry_time >= NOW() - INTERVAL '24 hours'
-                    AND status IN ('OPEN', 'CLOSED', 'SIGNAL_GENERATED')
-                ORDER BY
-                    (CASE WHEN profit_loss_usd > 0 THEN 1 ELSE 0 END) DESC,
-                    ABS(profit_loss_percentage) DESC,
-                    entry_time DESC
+                    signal_id as id,
+                    symbol as pair,
+                    action as direction,
+                    85 as confidence,
+                    price as "entryPrice",
+                    price as "currentPrice",
+                    COALESCE(quantity, 0) as quantity,
+                    0 as pnl,
+                    0 as "pnlPercent",
+                    received_at as timestamp,
+                    'PROCESSANDO' as status,
+                    COALESCE(strategy, 'TradingView Signal') as reasoning,
+                    source
+                FROM trading_signals
+                WHERE received_at >= NOW() - INTERVAL '24 hours'
+                ORDER BY received_at DESC
                 LIMIT 10
             `);
 
-            // If no real signals found, generate demo signals
-            if (result.rows.length === 0) {
-                return this.generateDemoTopSignals();
+            // Enrich signals with real-time prices and P&L
+            const enrichedSignals = [];
+            for (const [index, row] of result.rows.entries()) {
+                const entryPrice = parseFloat(row.entryPrice) || 0;
+                let currentPrice = entryPrice;
+                let pnl = 0;
+                let pnlPercent = 0;
+                let quantity = parseFloat(row.quantity) || 0.01; // Default quantity for display
+
+                // Fetch real-time price from Binance
+                try {
+                    const priceData = await this.binanceService.getSymbolPrice(row.pair);
+                    if (priceData.success && priceData.price) {
+                        currentPrice = parseFloat(priceData.price);
+
+                        // Calculate P&L based on direction
+                        if (row.direction === 'BUY' || row.direction === 'LONG') {
+                            pnl = (currentPrice - entryPrice) * quantity;
+                            pnlPercent = ((currentPrice - entryPrice) / entryPrice) * 100;
+                        } else { // SELL or SHORT
+                            pnl = (entryPrice - currentPrice) * quantity;
+                            pnlPercent = ((entryPrice - currentPrice) / entryPrice) * 100;
+                        }
+                    }
+                } catch (priceError) {
+                    console.warn(`Could not fetch price for ${row.pair}:`, priceError.message);
+                }
+
+                // Determine performance based on P&L
+                let performance = 'MEDIUM';
+                if (pnlPercent > 2) performance = 'HIGH';
+                else if (pnlPercent < -1) performance = 'LOW';
+
+                enrichedSignals.push({
+                    rank: index + 1,
+                    id: row.id,
+                    pair: row.pair,
+                    direction: row.direction,
+                    confidence: parseInt(row.confidence) || 85,
+                    entryPrice: entryPrice,
+                    currentPrice: currentPrice,
+                    quantity: quantity,
+                    pnl: Math.round(pnl * 100) / 100,
+                    pnlPercent: Math.round(pnlPercent * 100) / 100,
+                    status: 'PROCESSANDO',
+                    timestamp: row.timestamp,
+                    reasoning: row.reasoning || 'TradingView Signal',
+                    source: row.source || 'TRADINGVIEW',
+                    stopLoss: null,
+                    takeProfit: null,
+                    userId: 'global',
+                    performance: performance,
+                    activity: 'ACTIVE'
+                });
             }
 
-            return result.rows.map((row, index) => ({
-                rank: index + 1,
-                id: row.id.toString(),
-                pair: row.pair,
-                direction: row.direction,
-                confidence: Math.round(row.confidence || 0),
-                entryPrice: parseFloat(row.entry_price || 0),
-                currentPrice: parseFloat(row.exit_price || row.entry_price || 0),
-                quantity: parseFloat(row.quantity || 0),
-                pnl: parseFloat(row.pnl || 0),
-                pnlPercent: parseFloat(row.pnlPercent || 0),
-                status: this.mapOperationStatus(row.status),
-                timestamp: row.timestamp,
-                reasoning: row.reasoning || 'AI-generated signal',
-                source: row.signal_source || 'AI',
-                stopLoss: row.stop_loss ? parseFloat(row.stop_loss) : null,
-                takeProfit: row.take_profit ? parseFloat(row.take_profit) : null,
-                userId: row.user_id,
-                performance: this.calculateSignalPerformance(row.pnl, row.pnlPercent),
-                activity: this.calculateSignalActivity(row.timestamp)
-            }));
+            const topSignals = enrichedSignals;
+
+            console.log(`✅ Fetched ${topSignals.length} TradingView signals from database`);
+            return topSignals;
 
         } catch (error) {
-            // Handle specific database errors
-            if (error.code === '42P01') {
-                console.log('⚠️ Table "trading_operations" does not exist, using demo signals');
-            } else {
-                console.error('❌ Error getting top process signals:', error);
-            }
-            // Fallback to demo signals if database fails
-            return this.generateDemoTopSignals();
+            console.error('❌ Error fetching TradingView signals from database:', error);
+            // Return empty array instead of failing
+            return [];
         }
     }
 
@@ -552,8 +695,31 @@ class RealOperationsService {
 
     /**
      * Generate a new trading signal
+     * ⚠️ DEPRECATED: Use TradingView webhook for real signals
+     * This endpoint is kept for testing/demo purposes only
      */
     async generateNewSignal(userId) {
+        console.warn('⚠️ generateNewSignal() called - This is a DEMO endpoint');
+        console.warn('⚠️ Real signals should come from TradingView webhook: POST /api/tradingview/signal');
+
+        // Return instruction instead of generating mock data
+        return {
+            deprecated: true,
+            message: 'This endpoint is deprecated. Use TradingView webhook for real signals.',
+            instructions: {
+                webhook_url: '/api/tradingview/signal',
+                method: 'POST',
+                example_payload: {
+                    action: 'BUY',
+                    symbol: 'BTCUSDT',
+                    price: 50000,
+                    strategy: 'My Strategy'
+                }
+            },
+            note: 'Signals now come via WebSocket real-time from TradingView alerts'
+        };
+
+        /* DISABLED: Mock signal generation - commented out
         try {
             const cryptoPairs = [
                 'BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'MATICUSDT', 'DOTUSDT',
@@ -649,6 +815,7 @@ class RealOperationsService {
                 reasoning: 'Mock signal - database table not available'
             };
         }
+        END OF COMMENTED CODE */
     }
 
     /**

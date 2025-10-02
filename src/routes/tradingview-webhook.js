@@ -12,16 +12,8 @@ class TradingViewWebhookRoutes {
     constructor() {
         this.router = express.Router();
         this.personalTradingEngine = null; // Will be initialized when DB is set
+        this.dbPoolManager = null; // Will be set later
         this.setupRoutes();
-    }
-
-    /**
-     * Set database pool manager for webhook routes
-     */
-    setDbPoolManager(dbPoolManager) {
-        // Import here to avoid circular dependency
-        const PersonalTradingEngine = require('../trading/personal-api/personal-trading-engine');
-        this.personalTradingEngine = new PersonalTradingEngine(dbPoolManager);
     }
 
     setupRoutes() {
@@ -68,54 +60,55 @@ class TradingViewWebhookRoutes {
             // Parse TradingView signal into standard format
             const signal = this.parseWebhookToSignal(webhookData);
 
-            // Check if personal trading engine is initialized
-            if (!this.personalTradingEngine) {
-                console.log('⚠️ Personal trading engine not initialized, storing signal for later processing');
+            // ✅ STEP 1: INSTANT WebSocket Broadcast (PRIMARY - don't wait)
+            const tradingWebSocket = require('../services/websocket/trading-websocket');
+            tradingWebSocket.broadcastTradingSignal(signal);
+            console.log('📡 Signal broadcasted via WebSocket instantly');
 
-                // In production, you might queue this signal for later processing
-                return res.json({
-                    success: true,
-                    message: 'Signal received but trading engine not ready',
-                    signal,
-                    status: 'queued',
-                    timestamp: new Date().toISOString()
-                });
+            // ✅ STEP 2: ASYNC Save to database (don't block response)
+            this.saveSignalToDatabase(signal).catch(err =>
+                console.error('Error saving signal to database:', err)
+            );
+
+            // ✅ STEP 3: ASYNC Execute trades (don't block response)
+            let tradeExecutionPromise = null;
+            if (this.personalTradingEngine) {
+                console.log('🔑 Starting trade execution (async)...');
+                tradeExecutionPromise = this.personalTradingEngine.processSignalForAllUsers(signal)
+                    .catch(err => {
+                        console.error('Error executing trades:', err);
+                        return { success: false, error: err.message };
+                    });
+            } else {
+                console.log('⚠️ Personal trading engine not initialized, skipping trade execution');
             }
 
-            // Process signal through personal trading engine (users' own API keys)
-            console.log('🔑 Processing TradingView signal through personal API key trading engine...');
-            const executionResult = await this.personalTradingEngine.processSignalForAllUsers(signal);
-
-            // Enhanced response for TradingView
+            // ✅ STEP 4: Return immediately (don't wait for trades)
             const response = {
-                success: executionResult.success,
-                message: executionResult.success ? 'Signal processed successfully' : 'Signal processing failed',
+                success: true,
+                message: 'Signal received and broadcasted successfully',
                 webhook: {
                     source: 'TradingView',
-                    processed: true,
-                    signal: signal
+                    received: true,
+                    broadcasted: true,
+                    signal: {
+                        pair: signal.symbol,
+                        action: signal.action,
+                        price: signal.price,
+                        strategy: signal.strategy
+                    }
                 },
                 execution: {
-                    engine: 'personal-api-keys',
-                    mode: 'PERSONAL',
-                    total_users: executionResult.totalUsers,
-                    executed_trades: executionResult.executedTrades?.length || 0,
-                    ai_decision: executionResult.aiDecision?.action || 'UNKNOWN',
-                    ai_confidence: executionResult.aiDecision?.confidence || 0
-                },
-                results: {
-                    successful_trades: executionResult.executedTrades?.filter(t => t.success).length || 0,
-                    failed_trades: executionResult.executedTrades?.filter(t => !t.success).length || 0
+                    status: 'processing',
+                    note: 'Trades are being executed asynchronously'
                 },
                 timestamp: new Date().toISOString()
             };
 
-            // Return appropriate status code
-            const statusCode = executionResult.success ? 200 : 500;
+            console.log(`✅ TradingView webhook processed instantly: ${signal.symbol} ${signal.action}`);
 
-            console.log(`📊 TradingView webhook processed: ${response.execution.executed_trades} trades executed`);
-
-            res.status(statusCode).json(response);
+            // Return success immediately (trades execute in background)
+            res.json(response);
 
         } catch (error) {
             console.error('❌ Error processing TradingView webhook:', error);
@@ -130,6 +123,62 @@ class TradingViewWebhookRoutes {
                 timestamp: new Date().toISOString()
             });
         }
+    }
+
+    /**
+     * Save signal to database asynchronously (for history)
+     */
+    async saveSignalToDatabase(signal) {
+        try {
+            if (!this.dbPoolManager) {
+                console.log('⚠️ No database connection, skipping signal save');
+                return;
+            }
+
+            const signalId = `SIGNAL_${Date.now()}`;
+
+            await this.dbPoolManager.executeWrite(`
+                INSERT INTO trading_signals (
+                    signal_id, symbol, action, price, quantity,
+                    strategy, source, received_at, metadata
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                ON CONFLICT (signal_id) DO NOTHING
+            `, [
+                signalId,
+                signal.symbol,
+                signal.action,
+                signal.price || null,
+                signal.quantity || null,
+                signal.strategy,
+                'TRADINGVIEW',
+                new Date(),
+                JSON.stringify({
+                    alert_name: signal.alert_name,
+                    interval: signal.interval,
+                    stop_loss: signal.stop_loss,
+                    take_profit: signal.take_profit,
+                    webhook_data: signal.webhook_data
+                })
+            ]);
+
+            console.log(`💾 Signal saved to database: ${signalId}`);
+        } catch (error) {
+            // Don't throw - just log the error
+            console.error('Error saving signal to database:', error.message);
+        }
+    }
+
+    /**
+     * Set database pool manager for webhook routes
+     */
+    setDbPoolManager(dbPoolManager) {
+        this.dbPoolManager = dbPoolManager;
+
+        // Import here to avoid circular dependency
+        const PersonalTradingEngine = require('../trading/personal-api/personal-trading-engine');
+        this.personalTradingEngine = new PersonalTradingEngine(dbPoolManager);
+
+        console.log('✅ TradingView webhook: Database pool manager set');
     }
 
     /**

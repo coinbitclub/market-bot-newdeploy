@@ -32,7 +32,7 @@ class DatabaseConstructor {
     async connect() {
         try {
             const connectionString = process.env.DATABASE_URL;
-            
+
             if (!connectionString) {
                 throw new Error('DATABASE_URL not found in environment variables');
             }
@@ -44,15 +44,15 @@ class DatabaseConstructor {
                 idleTimeoutMillis: 30000,
                 connectionTimeoutMillis: 10000
             });
-            
+
             const client = await this.pool.connect();
             const result = await client.query('SELECT version(), current_database()');
             client.release();
-            
+
             console.log('✅ Connected to database:');
             console.log(`   Database: ${result.rows[0].current_database}`);
             console.log(`   Version: ${result.rows[0].version.split(' ')[0]} ${result.rows[0].version.split(' ')[1]}`);
-            
+
             return true;
         } catch (error) {
             console.error('❌ Database connection failed:', error.message);
@@ -79,7 +79,7 @@ class DatabaseConstructor {
     async dropAllTables() {
         console.log('\n🗑️  Dropping all existing tables...');
         console.log('='.repeat(60));
-        
+
         const tables = [
             'commission_records',
             'coupon_usage',
@@ -116,7 +116,7 @@ class DatabaseConstructor {
     async createCoreTables() {
         console.log('\n🏗️  Creating core tables...');
         console.log('='.repeat(60));
-        
+
         // 1. Plans table (independent)
         await this.executeSQL(`
             CREATE TABLE IF NOT EXISTS plans (
@@ -516,6 +516,21 @@ class DatabaseConstructor {
         `, 'Create performance_metrics table');
         this.stats.tablesCreated++;
 
+        await this.executeSQL(`
+            CREATE TABLE IF NOT EXISTS trading_signals (
+                signal_id VARCHAR(100) PRIMARY KEY,
+                symbol VARCHAR(20) NOT NULL,
+                action VARCHAR(10) NOT NULL,
+                price DECIMAL(20, 8),
+                quantity DECIMAL(20, 8),
+                strategy VARCHAR(255),
+                source VARCHAR(50),
+                received_at TIMESTAMP DEFAULT NOW(),
+                metadata JSONB
+        );
+        `, 'Create trading_signals table');
+        this.stats.tablesCreated++;
+
         // User performance cache
         await this.executeSQL(`
             CREATE TABLE IF NOT EXISTS user_performance_cache (
@@ -851,23 +866,23 @@ class DatabaseConstructor {
             'CREATE INDEX IF NOT EXISTS idx_users_plan_type ON users(plan_type);',
             'CREATE INDEX IF NOT EXISTS idx_users_user_type ON users(user_type);',
             'CREATE INDEX IF NOT EXISTS idx_users_affiliate_code ON users(affiliate_code);',
-            
+
             // Plans indexes
             'CREATE INDEX IF NOT EXISTS idx_plans_code ON plans(code);',
             'CREATE INDEX IF NOT EXISTS idx_plans_region ON plans(region);',
             'CREATE INDEX IF NOT EXISTS idx_plans_active ON plans(is_active);',
-            
+
             // Trading operations indexes
             'CREATE INDEX IF NOT EXISTS idx_trading_ops_user_id ON trading_operations(user_id);',
             'CREATE INDEX IF NOT EXISTS idx_trading_ops_trading_pair ON trading_operations(trading_pair);',
             'CREATE INDEX IF NOT EXISTS idx_trading_ops_status ON trading_operations(status);',
             'CREATE INDEX IF NOT EXISTS idx_trading_ops_entry_time ON trading_operations(entry_time DESC);',
-            
+
             // Performance metrics indexes
             'CREATE INDEX IF NOT EXISTS idx_perf_user_id ON performance_metrics(user_id);',
             'CREATE INDEX IF NOT EXISTS idx_perf_metric_key ON performance_metrics(metric_key);',
             'CREATE INDEX IF NOT EXISTS idx_perf_timestamp ON performance_metrics(timestamp DESC);',
-            
+
             // Performance cache and analytics indexes
             'CREATE INDEX IF NOT EXISTS idx_perf_cache_user_id ON user_performance_cache(user_id);',
             'CREATE INDEX IF NOT EXISTS idx_pair_perf_user_id ON trading_pair_performance(user_id);',
@@ -876,12 +891,12 @@ class DatabaseConstructor {
             'CREATE INDEX IF NOT EXISTS idx_monthly_perf_month ON user_performance_monthly(performance_month DESC);',
             'CREATE INDEX IF NOT EXISTS idx_daily_perf_user_id ON user_performance_daily(user_id);',
             'CREATE INDEX IF NOT EXISTS idx_daily_perf_date ON user_performance_daily(performance_date DESC);',
-            
+
             // Payment transactions indexes
             'CREATE INDEX IF NOT EXISTS idx_payment_user_id ON payment_transactions(user_id);',
             'CREATE INDEX IF NOT EXISTS idx_payment_status ON payment_transactions(status);',
             'CREATE INDEX IF NOT EXISTS idx_payment_created ON payment_transactions(created_at DESC);',
-            
+
             // User sessions indexes
             'CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON user_sessions(user_id);',
             'CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions(expires_at);'
@@ -922,7 +937,7 @@ class DatabaseConstructor {
         // Seed default admin user
         const bcrypt = require('bcrypt');
         const adminPassword = await bcrypt.hash('admin123', 10);
-        
+
         await this.executeSQL(`
             INSERT INTO users (username, email, password_hash, full_name, user_type, plan_type, country, is_active, is_admin, trading_enabled) 
             VALUES ('admin', 'admin@coinbitclub.com', '${adminPassword}', 'Administrator', 'ADMIN', 'PRO_US', 'US', true, true, true)
@@ -943,15 +958,15 @@ class DatabaseConstructor {
                 WHERE table_schema = 'public' 
                 ORDER BY table_name
             `);
-            
+
             console.log(`\n📋 Total tables created: ${tables.rows.length}`);
             tables.rows.forEach(row => {
                 console.log(`   - ${row.table_name}`);
             });
-            
+
             // Check data in key tables
             const keyTables = ['users', 'plans', 'trading_operations', 'performance_metrics'];
-            
+
             console.log('\n📊 Data counts:');
             for (const tableName of keyTables) {
                 try {
@@ -961,7 +976,7 @@ class DatabaseConstructor {
                     console.log(`   - ${tableName}: table not found`);
                 }
             }
-            
+
             console.log('\n✅ Database verification completed');
             return true;
         } catch (error) {
@@ -974,19 +989,19 @@ class DatabaseConstructor {
         console.log('🏗️  COMPLETE DATABASE CONSTRUCTION');
         console.log('='.repeat(60));
         console.log('Starting comprehensive database setup...\n');
-        
+
         try {
             // Connect to database
             const connected = await this.connect();
             if (!connected) {
                 throw new Error('Failed to connect to database');
             }
-            
+
             // Drop existing tables if requested
             if (dropExisting) {
                 await this.dropAllTables();
             }
-            
+
             // Create all tables in proper order
             await this.createCoreTables();
             await this.createUserRelatedTables();
@@ -994,16 +1009,16 @@ class DatabaseConstructor {
             await this.createPaymentTables();
             await this.createStripeTables();
             await this.createAffiliateTables();
-            
+
             // Create indexes
             await this.createIndexes();
-            
+
             // Seed initial data
             await this.seedInitialData();
-            
+
             // Verify everything
             await this.verifyDatabase();
-            
+
             // Print statistics
             console.log('\n' + '='.repeat(60));
             console.log('📊 Construction Statistics:');
@@ -1012,10 +1027,10 @@ class DatabaseConstructor {
             console.log(`   ✅ Data records seeded: ${this.stats.dataSeeded}`);
             console.log(`   ❌ Errors: ${this.stats.errors}`);
             console.log('='.repeat(60));
-            
+
             console.log('\n🎉 Database construction completed successfully!');
             console.log('✅ Your database is ready for production use');
-            
+
         } catch (error) {
             console.error('\n❌ Database construction failed:', error.message);
             console.error(error.stack);
@@ -1032,7 +1047,7 @@ class DatabaseConstructor {
 // Main execution
 if (require.main === module) {
     const dropExisting = process.argv.includes('--drop-existing');
-    
+
     if (dropExisting) {
         console.log('⚠️  WARNING: --drop-existing flag detected');
         console.log('⚠️  This will DELETE ALL existing data!');

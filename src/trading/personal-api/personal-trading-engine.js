@@ -369,40 +369,151 @@ class PersonalTradingEngine {
 
     /**
      * Save trade execution to database
+     * UPDATED: Now saves to trading_operations for unified performance tracking
      */
     async saveTradeExecution(tradeId, tradeData) {
         try {
+            const operationId = `OP_${Date.now()}_${tradeData.userId}`;
+
             await this.dbPoolManager.executeWrite(`
-                INSERT INTO trade_executions (
-                    trade_id, user_id, username, plan_type, symbol, side, exchange,
-                    order_id, position_size, executed_price, executed_qty,
-                    commission_percent, success, error_message, simulated, metadata
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                INSERT INTO trading_operations (
+                    user_id, operation_id, trade_id, trading_pair, operation_type,
+                    side, entry_price, quantity, exchange, order_id,
+                    position_size, commission_percent, plan_type,
+                    status, entry_time, personal_key, simulated, success,
+                    error_message, signal_source, metadata
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+                RETURNING id, operation_id
             `, [
-                tradeId,
                 tradeData.userId,
-                tradeData.username,
-                tradeData.planType,
+                operationId,
+                tradeId,
                 tradeData.symbol,
+                tradeData.side === 'BUY' ? 'LONG' : 'SHORT',
                 tradeData.side,
+                tradeData.executedPrice,
+                tradeData.executedQty,
                 tradeData.exchange,
                 tradeData.orderId,
                 tradeData.positionSize,
-                tradeData.executedPrice,
-                tradeData.executedQty,
                 tradeData.commission,
+                tradeData.planType,
+                'OPEN', // Initially OPEN
+                new Date().toISOString(),
+                tradeData.personalKey || true,
+                false, // Not simulated
                 tradeData.success,
-                tradeData.message || null,
-                false,
+                tradeData.success ? null : tradeData.message,
+                'AI',
                 JSON.stringify({
                     timestamp: tradeData.timestamp,
-                    personalKey: tradeData.personalKey
+                    personalKey: tradeData.personalKey,
+                    username: tradeData.username
                 })
             ]);
 
-            console.log(`💾 Personal trade saved: ${tradeId} for user ${tradeData.username}`);
+            console.log(`💾 Trade saved to trading_operations: ${operationId} for user ${tradeData.username}`);
+
+            // Broadcast new operation to user via WebSocket
+            const tradingWebSocket = require('../../services/websocket/trading-websocket');
+            tradingWebSocket.broadcastNewOperation(tradeData.userId, {
+                operation_id: operationId,
+                trading_pair: tradeData.symbol,
+                operation_type: tradeData.side === 'BUY' ? 'LONG' : 'SHORT',
+                entry_price: tradeData.executedPrice,
+                quantity: tradeData.executedQty,
+                status: 'OPEN',
+                entry_time: new Date().toISOString()
+            });
+
         } catch (error) {
             console.error('❌ Error saving trade execution:', error.message);
+            console.error('   Full error:', error);
+        }
+    }
+
+    /**
+     * Close trade operation and calculate P&L
+     */
+    async closeTradeOperation(operationId, exitData) {
+        try {
+            const duration = Math.floor((new Date(exitData.exitTime) - new Date(exitData.entryTime)) / 60000);
+            const profitLossUsd = (exitData.exitPrice - exitData.entryPrice) * exitData.quantity * (exitData.operationType === 'LONG' ? 1 : -1);
+            const profitLossPercent = ((exitData.exitPrice - exitData.entryPrice) / exitData.entryPrice) * 100 * (exitData.operationType === 'LONG' ? 1 : -1);
+            const netPnl = profitLossUsd - (exitData.commission || 0);
+
+            await this.dbPoolManager.executeWrite(`
+                UPDATE trading_operations
+                SET
+                    exit_price = $1,
+                    exit_time = $2,
+                    status = 'CLOSED',
+                    duration_minutes = $3,
+                    profit_loss_usd = $4,
+                    profit_loss_percentage = $5,
+                    net_pnl = $6,
+                    updated_at = NOW()
+                WHERE operation_id = $7
+                RETURNING id, user_id
+            `, [
+                exitData.exitPrice,
+                exitData.exitTime,
+                duration,
+                profitLossUsd,
+                profitLossPercent,
+                netPnl,
+                operationId
+            ]);
+
+            console.log(`✅ Trade closed: ${operationId} - P&L: $${profitLossUsd.toFixed(2)} (${profitLossPercent.toFixed(2)}%)`);
+
+            // Broadcast operation closed to user via WebSocket
+            const tradingWebSocket = require('../../services/websocket/trading-websocket');
+            tradingWebSocket.broadcastOperationClosed(exitData.userId, {
+                operation_id: operationId,
+                trading_pair: exitData.symbol,
+                entry_price: exitData.entryPrice,
+                exit_price: exitData.exitPrice,
+                profit_loss_usd: profitLossUsd,
+                profit_loss_percentage: profitLossPercent,
+                duration_minutes: duration
+            });
+
+            // Update user performance
+            await this.updateUserPerformance(exitData.userId);
+
+            return {
+                success: true,
+                profitLossUsd,
+                profitLossPercent,
+                netPnl
+            };
+        } catch (error) {
+            console.error('❌ Error closing trade:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Update user performance cache after trade closes
+     */
+    async updateUserPerformance(userId) {
+        try {
+            // Call the calculate_user_performance function
+            await this.dbPoolManager.executeWrite('SELECT calculate_user_performance($1)', [userId]);
+
+            console.log(`📊 Performance updated for user ${userId}`);
+
+            // Broadcast performance update via WebSocket
+            tradingWebSocket.broadcastPerformanceUpdate(userId);
+
+            return { success: true };
+        } catch (error) {
+            console.error('❌ Error updating performance:', error);
+            return { success: false, error: error.message };
         }
     }
 

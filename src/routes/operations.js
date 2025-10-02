@@ -38,7 +38,7 @@ class OperationsRoutes {
         this.router.get('/positions', this.getPositions.bind(this));
         this.router.get('/daily-stats', this.getDailyStats.bind(this));
         this.router.get('/all', this.getAllOperationsData.bind(this));
-        
+
         // Top signals
         this.router.get('/top-signals', this.getTopSignals.bind(this));
 

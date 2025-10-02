@@ -403,40 +403,52 @@ class BalanceTradingEngine {
     }
 
     /**
-     * Save trade execution to database
+     * Save trade execution to database (unified trading_operations table)
      */
     async saveTradeExecution(tradeId, tradeData) {
         try {
+            // Generate unique operation ID
+            const operationId = `OP_${Date.now()}_${tradeData.userId}`;
+
             await this.dbPoolManager.executeWrite(`
-                INSERT INTO trade_executions (
-                    trade_id, user_id, username, plan_type, symbol, side, exchange,
-                    order_id, position_size, executed_price, executed_qty,
-                    commission_percent, success, error_message, simulated, metadata
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                INSERT INTO trading_operations (
+                    user_id, operation_id, trade_id, trading_pair, operation_type,
+                    side, entry_price, quantity, exchange, order_id,
+                    position_size, commission_percent, plan_type,
+                    status, entry_time, personal_key, simulated, success,
+                    error_message, signal_source, metadata
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+                RETURNING id, operation_id
             `, [
-                tradeId,
                 tradeData.userId,
-                tradeData.username,
-                tradeData.planType,
-                tradeData.symbol,
+                operationId,
+                tradeId,
+                tradeData.symbol, // trading_pair
+                tradeData.side === 'BUY' ? 'LONG' : 'SHORT', // operation_type
                 tradeData.side,
+                tradeData.executedPrice, // entry_price
+                tradeData.executedQty, // quantity
                 tradeData.exchange || 'testnet',
                 tradeData.orderId,
                 tradeData.positionSize,
-                tradeData.executedPrice,
-                tradeData.executedQty,
-                tradeData.commission,
+                tradeData.commission || 0,
+                tradeData.planType,
+                'OPEN', // status (starts as OPEN for pooled trading)
+                new Date(), // entry_time
+                false, // personal_key (pooled trading uses admin keys)
+                tradeData.simulated || false,
                 tradeData.success,
                 tradeData.message || null,
-                tradeData.simulated || false,
+                'BALANCE_POOL', // signal_source
                 JSON.stringify({
                     timestamp: tradeData.timestamp,
                     stopLoss: tradeData.stopLoss,
-                    takeProfit: tradeData.takeProfit
+                    takeProfit: tradeData.takeProfit,
+                    username: tradeData.username
                 })
             ]);
 
-            console.log(`💾 Trade execution saved to database: ${tradeId} for user ${tradeData.username}`);
+            console.log(`💾 Trade execution saved to trading_operations: ${operationId} for user ${tradeData.username}`);
         } catch (error) {
             console.error('❌ Error saving trade execution:', error.message);
         }
