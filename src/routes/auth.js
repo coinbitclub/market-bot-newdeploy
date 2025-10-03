@@ -16,14 +16,15 @@ const { body, validationResult } = require('express-validator');
 class AuthRoutes {
     constructor() {
         this.dbPoolManager = null; // Will be set later
+        this.affiliateService = null; // Will be set later
         this.jwtSecret = process.env.JWT_SECRET || 'coinbitclub_enterprise_secret_2025';
         this.jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'coinbitclub_refresh_secret_2025';
         this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '24h';
         this.jwtRefreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
-        
+
         // Create router inside the class
         this.router = express.Router();
-        
+
         this.setupRoutes();
     }
 
@@ -32,6 +33,13 @@ class AuthRoutes {
      */
     setDbPoolManager(dbPoolManager) {
         this.dbPoolManager = dbPoolManager;
+    }
+
+    /**
+     * 🔧 Set affiliate service
+     */
+    setAffiliateService(affiliateService) {
+        this.affiliateService = affiliateService;
     }
 
     setupRoutes() {
@@ -192,7 +200,7 @@ class AuthRoutes {
                 });
             }
 
-            const { email, password, username, full_name, user_type = 'USER' } = req.body;
+            const { email, password, username, full_name, user_type = 'USER', referralCode } = req.body;
 
             // Verificar se usuário já existe
             const existingUser = await this.dbPoolManager.executeRead(
@@ -238,6 +246,17 @@ class AuthRoutes {
 
             const user = newUser.rows[0];
             const tokens = this.generateTokens(user);
+
+            // Track affiliate conversion if referral code provided
+            if (referralCode && this.affiliateService) {
+                try {
+                    await this.affiliateService.trackConversion(referralCode, user.id, 0);
+                    console.log(`✅ Affiliate conversion tracked: ${referralCode} -> User ${user.id}`);
+                } catch (affiliateError) {
+                    console.warn('⚠️ Failed to track affiliate conversion:', affiliateError.message);
+                    // Don't fail registration if affiliate tracking fails
+                }
+            }
 
             res.status(201).json({
                 success: true,
