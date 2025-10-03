@@ -27,6 +27,12 @@ class UserAPIKeysRoutes {
         // All routes require authentication
         this.router.use(this.authMiddleware.authenticate.bind(this.authMiddleware));
 
+        // Get all API keys status (MUST be before /:exchange/status to avoid matching "all" as exchange)
+        this.router.get('/all/status', this.getAllAPIKeysStatus.bind(this));
+
+        // Set trading mode
+        this.router.post('/trading-mode', this.setTradingMode.bind(this));
+
         // Get API key status for an exchange
         this.router.get('/:exchange/status', this.getAPIKeyStatus.bind(this));
 
@@ -38,12 +44,6 @@ class UserAPIKeysRoutes {
 
         // Delete API key
         this.router.delete('/:exchange', this.deleteAPIKey.bind(this));
-
-        // Get all API keys status
-        this.router.get('/all/status', this.getAllAPIKeysStatus.bind(this));
-
-        // Set trading mode
-        this.router.post('/trading-mode', this.setTradingMode.bind(this));
     }
 
     /**
