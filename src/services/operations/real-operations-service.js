@@ -233,72 +233,61 @@ class RealOperationsService {
     }
 
     /**
-     * Get trading signals from database (recent operations)
+     * Get trading signals from database (TradingView webhook signals)
      */
     async getTradingSignals(userId, limit = 20) {
         try {
-            console.log(`📡 Fetching trading signals for user ${userId} from database...`);
+            console.log(`📡 Fetching TradingView signals from database...`);
 
             if (!this.pool) {
                 console.log('⚠️ No database connection, returning empty signals');
                 return [];
             }
 
-            // Query recent operations from trading_operations table
+            // Query TradingView signals from trading_signals table
             const result = await this.pool.query(`
                 SELECT
-                    id,
-                    operation_id as id,
-                    trading_pair as pair,
-                    operation_type as direction,
-                    COALESCE(confidence_score, 85) as confidence,
-                    entry_price as "entryPrice",
-                    COALESCE(exit_price, entry_price) as "currentPrice",
-                    quantity,
-                    COALESCE(profit_loss_usd, 0) as pnl,
-                    COALESCE(profit_loss_percentage, 0) as "pnlPercent",
-                    entry_time as timestamp,
-                    status,
-                    reasoning,
-                    signal_source as source
-                FROM trading_operations
-                WHERE user_id = $1
-                ORDER BY entry_time DESC
-                LIMIT $2
-            `, [userId, limit]);
+                    signal_id as id,
+                    symbol as pair,
+                    action as direction,
+                    COALESCE(metadata->>'confidence', '85')::int as confidence,
+                    price as "entryPrice",
+                    price as "currentPrice",
+                    COALESCE(quantity, 0) as quantity,
+                    0 as pnl,
+                    0 as "pnlPercent",
+                    received_at as timestamp,
+                    'PROCESSANDO' as status,
+                    COALESCE(strategy, 'TradingView Signal') as reasoning,
+                    source
+                FROM trading_signals
+                WHERE source = 'TRADINGVIEW'
+                ORDER BY received_at DESC
+                LIMIT $1
+            `, [limit]);
 
-            const signals = result.rows.map(row => {
-                // Determine status based on operation status
-                let signalStatus = 'PROCESSANDO';
-                if (row.status === 'OPEN') {
-                    signalStatus = 'EXECUTADO';
-                } else if (row.status === 'CLOSED') {
-                    signalStatus = parseFloat(row.pnl) > 0 ? 'APROVADO' : 'DESCARTADO';
-                }
+            const signals = result.rows.map(row => ({
+                id: row.id,
+                pair: row.pair,
+                direction: row.direction,
+                strength: parseInt(row.confidence) || 85,
+                confidence: parseInt(row.confidence) || 85,
+                entryPrice: parseFloat(row.entryPrice) || 0,
+                currentPrice: parseFloat(row.currentPrice) || 0,
+                quantity: parseFloat(row.quantity) || 0,
+                pnl: 0,
+                pnlPercent: 0,
+                timestamp: row.timestamp,
+                status: 'PROCESSANDO',
+                reasoning: row.reasoning || 'TradingView Signal',
+                source: row.source || 'TRADINGVIEW'
+            }));
 
-                return {
-                    id: row.id,
-                    pair: row.pair,
-                    direction: row.direction,
-                    strength: parseInt(row.confidence) || 0,
-                    confidence: parseInt(row.confidence) || 0,
-                    entryPrice: parseFloat(row.entryPrice),
-                    currentPrice: parseFloat(row.currentPrice),
-                    quantity: parseFloat(row.quantity) || 0,
-                    pnl: parseFloat(row.pnl) || 0,
-                    pnlPercent: parseFloat(row.pnlPercent) || 0,
-                    timestamp: row.timestamp,
-                    status: signalStatus,
-                    reasoning: row.reasoning || 'Operação em andamento',
-                    source: row.source || 'TRADING_BOT'
-                };
-            });
-
-            console.log(`✅ Fetched ${signals.length} trading signals from database`);
+            console.log(`✅ Fetched ${signals.length} TradingView signals from database`);
             return signals;
 
         } catch (error) {
-            console.error('❌ Error fetching trading signals from database:', error);
+            console.error('❌ Error fetching TradingView signals from database:', error);
             return [];
         }
     }

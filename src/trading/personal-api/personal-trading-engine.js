@@ -118,7 +118,7 @@ class PersonalTradingEngine {
             // Get users with verified personal API keys (PERSONAL mode only - no admin keys)
             // Uses existing user_api_keys table
             const result = await this.dbPoolManager.executeRead(`
-                SELECT DISTINCT
+                SELECT
                     u.id, u.username, u.plan_type, u.subscription_status,
                     u.balance_real_brl, u.balance_real_usd,
                     u.balance_admin_brl, u.balance_admin_usd,
@@ -128,7 +128,13 @@ class PersonalTradingEngine {
                     uak.api_key,
                     uak.verified,
                     uak.enabled,
-                    uak.is_active
+                    uak.is_active,
+                    CASE
+                        WHEN u.plan_type LIKE 'PRO%' THEN 1
+                        WHEN u.plan_type LIKE 'FLEX%' THEN 2
+                        WHEN u.plan_type = 'TRIAL' THEN 3
+                        ELSE 4
+                    END as plan_priority
                 FROM users u
                 INNER JOIN user_api_keys uak ON u.id = uak.user_id
                 WHERE u.subscription_status = 'active'
@@ -139,13 +145,7 @@ class PersonalTradingEngine {
                 AND uak.verified = TRUE
                 AND uak.api_key IS NOT NULL
                 AND uak.api_secret IS NOT NULL
-                ORDER BY
-                    CASE
-                        WHEN u.plan_type LIKE 'PRO%' THEN 1
-                        WHEN u.plan_type LIKE 'FLEX%' THEN 2
-                        WHEN u.plan_type = 'TRIAL' THEN 3
-                        ELSE 4
-                    END
+                ORDER BY plan_priority
             `, [preferredExchange.toLowerCase()]);
 
             return result.rows.map(user => ({
@@ -185,7 +185,7 @@ class PersonalTradingEngine {
 
         // Execute by priority with delays
         for (const [planType, planUsers] of Object.entries(usersByPlan)) {
-            const planConfig = this.PLAN_PRIORITIES[planType];
+            const planConfig = this.PLAN_PRIORITIES[planType] || this.PLAN_PRIORITIES['TRIAL'];
 
             console.log(`⏳ Executing for ${planType} users (${planUsers.length}) with ${planConfig.delay}ms delay`);
 
@@ -264,12 +264,33 @@ class PersonalTradingEngine {
             // Create exchange service with user's credentials
             const exchangeService = await this.createUserExchangeService(user.preferredExchange, credentials);
 
+            // Calculate quantity - use signal quantity if provided, otherwise calculate
+            const calculatedQty = signal.quantity || this.calculateQuantity(signal.symbol, positionSize, signal.price);
+
+            console.log(`📊 Trade calculation for ${user.username}:`, {
+                positionSize,
+                signalQuantity: signal.quantity,
+                calculatedQty,
+                symbol: signal.symbol,
+                price: signal.price
+            });
+
+            // Validate quantity
+            if (!calculatedQty || calculatedQty <= 0 || isNaN(calculatedQty)) {
+                return {
+                    userId: user.id,
+                    username: user.username,
+                    success: false,
+                    message: `Invalid quantity calculated: ${calculatedQty} (positionSize: $${positionSize})`
+                };
+            }
+
             // Prepare trade parameters
             const tradeParams = {
                 symbol: signal.symbol,
                 side: aiDecision.action === 'BUY' ? 'Buy' : 'Sell',
                 orderType: 'Market',
-                qty: this.calculateQuantity(signal.symbol, positionSize),
+                qty: calculatedQty,
                 stopLoss: aiDecision.stopLoss,
                 takeProfit: aiDecision.takeProfit
             };
@@ -350,21 +371,50 @@ class PersonalTradingEngine {
 
     /**
      * Calculate quantity based on symbol and position size
+     * @param {string} symbol - Trading pair (e.g., BTCUSDT)
+     * @param {number} positionSizeUSD - Position size in USD
+     * @param {number} actualPrice - Actual price from signal (optional)
+     * @returns {number} Calculated quantity
      */
-    calculateQuantity(symbol, positionSizeUSD) {
+    calculateQuantity(symbol, positionSizeUSD, actualPrice) {
+        // Use actual price from signal if provided, otherwise use approximation
         const approximatePrices = {
-            'BTCUSDT': 50000,
-            'ETHUSDT': 3000,
+            'BTCUSDT': 65000,
+            'ETHUSDT': 3200,
             'ADAUSDT': 0.5,
-            'SOLUSDT': 100
+            'SOLUSDT': 150,
+            'BNBUSDT': 600,
+            'XRPUSDT': 0.6,
+            'DOGEUSDT': 0.1,
+            'MATICUSDT': 0.8,
+            'DOTUSDT': 7
         };
 
-        const price = approximatePrices[symbol] || approximatePrices['BTCUSDT'];
+        const price = actualPrice || approximatePrices[symbol] || approximatePrices['BTCUSDT'];
+
+        // Ensure valid inputs
+        if (!price || price <= 0 || !positionSizeUSD || positionSizeUSD <= 0) {
+            console.error('❌ Invalid inputs for quantity calculation:', { symbol, positionSizeUSD, price });
+            return 0;
+        }
+
         const quantity = positionSizeUSD / price;
 
-        if (symbol.includes('BTC')) return Math.round(quantity * 100000) / 100000;
-        if (symbol.includes('ETH')) return Math.round(quantity * 1000) / 1000;
-        return Math.round(quantity * 100) / 100;
+        // Round according to symbol precision requirements
+        let rounded;
+        if (symbol.includes('BTC')) {
+            rounded = Math.round(quantity * 100000) / 100000; // 5 decimals
+        } else if (symbol.includes('ETH')) {
+            rounded = Math.round(quantity * 10000) / 10000; // 4 decimals
+        } else if (symbol.includes('DOGE') || symbol.includes('XRP') || symbol.includes('ADA')) {
+            rounded = Math.round(quantity * 10) / 10; // 1 decimal
+        } else {
+            rounded = Math.round(quantity * 100) / 100; // 2 decimals
+        }
+
+        console.log(`📊 Quantity calculation: ${positionSizeUSD} USD / ${price} = ${rounded} ${symbol}`);
+
+        return rounded;
     }
 
     /**

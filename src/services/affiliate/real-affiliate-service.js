@@ -356,7 +356,8 @@ class RealAffiliateService {
                 monthlyCommissions: parseFloat(monthlyResult.rows[0].monthly_total),
                 commissionRate: parseFloat(affiliate.commission_rate),
                 currentBalance: parseFloat(affiliate.current_balance),
-                tier: affiliate.tier
+                tier: affiliate.tier,
+                affiliateCode: affiliate.affiliate_code
             };
 
         } catch (error) {
