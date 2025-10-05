@@ -333,13 +333,46 @@ class BalanceTradingEngine {
                 takeProfit: aiDecision.takeProfit
             };
 
-            // Execute on preferred exchange (Bybit first, then Binance)
-            let result = await this.exchangeService.bybitService.placeOrder(tradeParams);
-
-            if (!result.success) {
-                console.log('⚠️ Bybit failed, trying Binance...');
-                result = await this.exchangeService.binanceService.placeOrder(tradeParams);
+            // Execute on both exchanges if available
+            const results = [];
+            
+            // Try Bybit first
+            try {
+                const bybitResult = await this.exchangeService.bybitService.placeOrder(tradeParams);
+                results.push({
+                    exchange: 'bybit',
+                    success: bybitResult.success,
+                    result: bybitResult
+                });
+            } catch (error) {
+                console.log(`⚠️ Bybit failed for ${user.username}:`, error.message);
+                results.push({
+                    exchange: 'bybit',
+                    success: false,
+                    error: error.message
+                });
             }
+            
+            // Try Binance
+            try {
+                const binanceResult = await this.exchangeService.binanceService.placeOrder(tradeParams);
+                results.push({
+                    exchange: 'binance',
+                    success: binanceResult.success,
+                    result: binanceResult
+                });
+            } catch (error) {
+                console.log(`⚠️ Binance failed for ${user.username}:`, error.message);
+                results.push({
+                    exchange: 'binance',
+                    success: false,
+                    error: error.message
+                });
+            }
+            
+            // Use the first successful result, or the first result if none succeeded
+            const successfulResult = results.find(r => r.success);
+            const result = successfulResult ? successfulResult.result : results[0].result;
 
             return {
                 success: result.success,

@@ -231,7 +231,7 @@ class PersonalTradingEngine {
     }
 
     /**
-     * Execute trade using user's personal API key
+     * Execute trade using user's personal API key on both exchanges if connected
      */
     async executePersonalTrade(signal, aiDecision, user, planConfig) {
         try {
@@ -249,20 +249,19 @@ class PersonalTradingEngine {
                 };
             }
 
-            // Get user's API credentials
-            const credentials = await this.apiKeyManager.getAPICredentials(user.id, user.preferredExchange);
-
-            if (!credentials.success || !credentials.enabled) {
+            // Check which exchanges are connected
+            const connectedExchanges = await this.getConnectedExchanges(user.id);
+            
+            if (connectedExchanges.length === 0) {
                 return {
                     userId: user.id,
                     username: user.username,
                     success: false,
-                    message: 'API key not available or not enabled'
+                    message: 'No connected exchanges found'
                 };
             }
 
-            // Create exchange service with user's credentials
-            const exchangeService = await this.createUserExchangeService(user.preferredExchange, credentials);
+            console.log(`🔄 Trading on ${connectedExchanges.length} exchanges: ${connectedExchanges.join(', ')}`);
 
             // Calculate quantity - use signal quantity if provided, otherwise calculate
             const calculatedQty = signal.quantity || this.calculateQuantity(signal.symbol, positionSize, signal.price);
@@ -272,7 +271,8 @@ class PersonalTradingEngine {
                 signalQuantity: signal.quantity,
                 calculatedQty,
                 symbol: signal.symbol,
-                price: signal.price
+                price: signal.price,
+                exchanges: connectedExchanges
             });
 
             // Validate quantity
@@ -285,6 +285,106 @@ class PersonalTradingEngine {
                 };
             }
 
+            // Execute trades on all connected exchanges
+            const tradeResults = [];
+            
+            for (const exchange of connectedExchanges) {
+                try {
+                    const result = await this.executeTradeOnExchange(signal, aiDecision, user, planConfig, exchange, calculatedQty, positionSize);
+                    tradeResults.push(result);
+                } catch (error) {
+                    console.error(`❌ Error executing trade on ${exchange} for ${user.username}:`, error);
+                    tradeResults.push({
+                        userId: user.id,
+                        username: user.username,
+                        exchange,
+                        success: false,
+                        message: `Failed on ${exchange}: ${error.message}`
+                    });
+                }
+            }
+
+            // Return combined result
+            const successfulTrades = tradeResults.filter(r => r.success);
+            const failedTrades = tradeResults.filter(r => !r.success);
+
+            return {
+                userId: user.id,
+                username: user.username,
+                planType: user.plan_type,
+                positionSize,
+                commission: planConfig.commission,
+                symbol: signal.symbol,
+                side: aiDecision.action,
+                success: successfulTrades.length > 0,
+                message: `${successfulTrades.length}/${tradeResults.length} trades successful`,
+                exchanges: tradeResults,
+                successfulExchanges: successfulTrades.map(r => r.exchange),
+                failedExchanges: failedTrades.map(r => r.exchange),
+                timestamp: new Date().toISOString(),
+                personalKey: true
+            };
+
+        } catch (error) {
+            console.error(`❌ Error executing trade for user ${user.username}:`, error);
+            return {
+                userId: user.id,
+                username: user.username,
+                success: false,
+                message: error.message,
+                personalKey: true
+            };
+        }
+    }
+
+    /**
+     * Get connected exchanges for a user
+     */
+    async getConnectedExchanges(userId) {
+        try {
+            const exchanges = [];
+            
+            // Check Bybit connection
+            const bybitCredentials = await this.apiKeyManager.getAPICredentials(userId, 'bybit');
+            if (bybitCredentials.success && bybitCredentials.enabled) {
+                exchanges.push('bybit');
+            }
+            
+            // Check Binance connection
+            const binanceCredentials = await this.apiKeyManager.getAPICredentials(userId, 'binance');
+            if (binanceCredentials.success && binanceCredentials.enabled) {
+                exchanges.push('binance');
+            }
+            
+            console.log(`🔗 Connected exchanges for user ${userId}: ${exchanges.join(', ')}`);
+            return exchanges;
+        } catch (error) {
+            console.error('❌ Error checking connected exchanges:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Execute trade on specific exchange
+     */
+    async executeTradeOnExchange(signal, aiDecision, user, planConfig, exchange, calculatedQty, positionSize) {
+        try {
+            // Get user's API credentials for this exchange
+            const credentials = await this.apiKeyManager.getAPICredentials(user.id, exchange);
+
+            if (!credentials.success || !credentials.enabled) {
+                return {
+                    userId: user.id,
+                    username: user.username,
+                    exchange,
+                    success: false,
+                    message: `${exchange} API key not available or not enabled`
+                };
+            }
+
+            // Create exchange service with user's credentials
+            const exchangeService = await this.createUserExchangeService(exchange, credentials);
+
             // Prepare trade parameters
             const tradeParams = {
                 symbol: signal.symbol,
@@ -296,7 +396,7 @@ class PersonalTradingEngine {
             };
 
             // Execute trade
-            console.log(`🔥 Executing personal API call for ${user.username} on ${user.preferredExchange}`);
+            console.log(`🔥 Executing personal API call for ${user.username} on ${exchange}`);
             const result = await exchangeService.placeOrder(tradeParams);
 
             const tradeData = {
@@ -310,7 +410,7 @@ class PersonalTradingEngine {
                 success: result.success || false,
                 message: result.message || result.error || 'Trade executed',
                 orderId: result.orderId,
-                exchange: user.preferredExchange,
+                exchange,
                 executedPrice: result.price || signal.price,
                 executedQty: tradeParams.qty,
                 timestamp: new Date().toISOString(),
@@ -318,7 +418,7 @@ class PersonalTradingEngine {
             };
 
             // Save trade execution
-            await this.saveTradeExecution(`TRADE_${Date.now()}_${user.id}`, tradeData);
+            await this.saveTradeExecution(`TRADE_${Date.now()}_${user.id}_${exchange}`, tradeData);
 
             // Broadcast to user
             tradingWebSocket.broadcastTradeExecution(user.id, tradeData);
@@ -326,13 +426,13 @@ class PersonalTradingEngine {
             return tradeData;
 
         } catch (error) {
-            console.error(`❌ Error executing trade for user ${user.username}:`, error);
+            console.error(`❌ Error executing trade on ${exchange} for user ${user.username}:`, error);
             return {
                 userId: user.id,
                 username: user.username,
+                exchange,
                 success: false,
-                message: error.message,
-                personalKey: true
+                message: error.message
             };
         }
     }

@@ -233,64 +233,35 @@ class RealOperationsService {
     }
 
     /**
-     * Get trading signals from database (TradingView webhook signals)
+     * Get trading signals from TradingView webhook (real-time only)
+     * NO DATABASE - signals come directly from TradingView webhook via WebSocket
      */
     async getTradingSignals(userId, limit = 20) {
         try {
-            console.log(`📡 Fetching TradingView signals from database...`);
+            console.log(`📡 Getting real-time TradingView signals (webhook-only, no database)...`);
 
-            if (!this.pool) {
-                console.log('⚠️ No database connection, returning empty signals');
-                return [];
-            }
-
-            // Query TradingView signals from trading_signals table
-            const result = await this.pool.query(`
-                SELECT
-                    signal_id as id,
-                    symbol as pair,
-                    action as direction,
-                    COALESCE(metadata->>'confidence', '85')::int as confidence,
-                    price as "entryPrice",
-                    price as "currentPrice",
-                    COALESCE(quantity, 0) as quantity,
-                    0 as pnl,
-                    0 as "pnlPercent",
-                    received_at as timestamp,
-                    'PROCESSANDO' as status,
-                    COALESCE(strategy, 'TradingView Signal') as reasoning,
-                    source
-                FROM trading_signals
-                WHERE source = 'TRADINGVIEW'
-                ORDER BY received_at DESC
-                LIMIT $1
-            `, [limit]);
-
-            const signals = result.rows.map(row => ({
-                id: row.id,
-                pair: row.pair,
-                direction: row.direction,
-                strength: parseInt(row.confidence) || 85,
-                confidence: parseInt(row.confidence) || 85,
-                entryPrice: parseFloat(row.entryPrice) || 0,
-                currentPrice: parseFloat(row.currentPrice) || 0,
-                quantity: parseFloat(row.quantity) || 0,
-                pnl: 0,
-                pnlPercent: 0,
-                timestamp: row.timestamp,
-                status: 'PROCESSANDO',
-                reasoning: row.reasoning || 'TradingView Signal',
-                source: row.source || 'TRADINGVIEW'
-            }));
-
-            console.log(`✅ Fetched ${signals.length} TradingView signals from database`);
-            return signals;
+            // Real-time signals come ONLY from TradingView webhook via WebSocket
+            // This endpoint returns empty array - signals are broadcasted directly to frontend
+            // Frontend should listen to WebSocket events: 'trading_signal' and 'signal_update'
+            
+            console.log(`📡 NOTE: Real-time signals come via WebSocket from TradingView webhook`);
+            console.log(`📡 Frontend should listen to: 'trading_signal' and 'signal_update' events`);
+            console.log(`📡 No database polling - signals are broadcasted instantly when received`);
+            
+            // Return empty array - all signals come via WebSocket
+            return [];
 
         } catch (error) {
-            console.error('❌ Error fetching TradingView signals from database:', error);
+            console.error('❌ Error in getTradingSignals:', error);
             return [];
         }
     }
+
+    /**
+     * REMOVED: broadcastSignalUpdate method
+     * Real-time signals now come directly from TradingView webhook
+     * No need for database-based broadcasting
+     */
 
     /**
      * Get real-time positions with live market prices from database
@@ -386,300 +357,159 @@ class RealOperationsService {
     }
 
     /**
-     * Get real-time daily statistics from database
+     * Get today's statistics only from database
+     * Focused on daily performance metrics
      */
     async getDailyStats(userId) {
         try {
-            console.log(`📡 Fetching daily stats for user ${userId} from database...`);
+            console.log(`📡 Fetching TODAY'S stats for user ${userId} from database...`);
 
             if (!this.pool) {
                 console.log('⚠️ No database connection, returning default stats');
                 return {
                     operationsToday: 0,
                     successRate: 0,
-                    historicalSuccessRate: 0,
                     todayReturnUSD: 0,
                     todayReturnPercent: 0,
                     totalInvested: 10000
                 };
             }
 
-            // First, try to get from user_performance_cache table
-            const cacheResult = await this.pool.query(`
-                SELECT
-                    today_operations,
-                    today_profit_loss,
-                    today_win_rate,
-                    total_operations,
-                    total_profit_loss_usd,
-                    overall_win_rate,
-                    last_updated
-                FROM user_performance_cache
-                WHERE user_id = $1
-            `, [userId]);
-
-            if (cacheResult.rows.length > 0) {
-                const cache = cacheResult.rows[0];
-
-                // Calculate today's return percentage
-                const totalInvested = 10000; // Default investment
-                const todayReturnPercent = totalInvested > 0
-                    ? (parseFloat(cache.today_profit_loss || 0) / totalInvested) * 100
-                    : 0;
-
-                console.log(`✅ Fetched daily stats from cache for user ${userId}`);
-                return {
-                    operationsToday: parseInt(cache.today_operations || 0),
-                    successRate: parseFloat(cache.today_win_rate || 0),
-                    historicalSuccessRate: parseFloat(cache.overall_win_rate || 0),
-                    todayReturnUSD: parseFloat(cache.today_profit_loss || 0),
-                    todayReturnPercent: todayReturnPercent,
-                    totalInvested: totalInvested
-                };
-            }
-
-            // If no cache, calculate from trading_operations directly
-            console.log('⚠️ No cache found, calculating from trading_operations...');
-
+            // Set today's date range
             const today = new Date();
             today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
 
+            console.log(`📅 Today's range: ${today.toISOString()} to ${tomorrow.toISOString()}`);
+
+            // Calculate today's stats from trading_operations
             const todayResult = await this.pool.query(`
                 SELECT
                     COUNT(*) as operations_count,
                     COUNT(CASE WHEN profit_loss_usd > 0 THEN 1 END) as winning_ops,
-                    COALESCE(SUM(profit_loss_usd), 0) as total_pnl
+                    COUNT(CASE WHEN profit_loss_usd < 0 THEN 1 END) as losing_ops,
+                    COUNT(CASE WHEN profit_loss_usd = 0 THEN 1 END) as neutral_ops,
+                    COALESCE(SUM(profit_loss_usd), 0) as total_pnl,
+                    COALESCE(AVG(profit_loss_usd), 0) as avg_pnl,
+                    COALESCE(MAX(profit_loss_usd), 0) as best_trade,
+                    COALESCE(MIN(profit_loss_usd), 0) as worst_trade,
+                    COALESCE(SUM(ABS(profit_loss_usd)), 0) as total_volume
                 FROM trading_operations
                 WHERE user_id = $1
                 AND entry_time >= $2
+                AND entry_time < $3
                 AND status = 'CLOSED'
-            `, [userId, today]);
+            `, [userId, today, tomorrow]);
 
-            const allTimeResult = await this.pool.query(`
+            // Get today's open positions for additional context
+            const openPositionsResult = await this.pool.query(`
                 SELECT
-                    COUNT(*) as total_operations,
-                    COUNT(CASE WHEN profit_loss_usd > 0 THEN 1 END) as total_winning,
-                    COALESCE(SUM(profit_loss_usd), 0) as total_pnl
+                    COUNT(*) as open_positions,
+                    COALESCE(SUM(quantity * entry_price), 0) as open_value
                 FROM trading_operations
                 WHERE user_id = $1
-                AND status = 'CLOSED'
-            `, [userId]);
+                AND entry_time >= $2
+                AND entry_time < $3
+                AND status = 'OPEN'
+            `, [userId, today, tomorrow]);
 
-            const todayData = todayResult.rows[0];
-            const allTimeData = allTimeResult.rows[0];
+            const todayData = todayResult.rows[0] || {};
+            const openPositionsData = openPositionsResult.rows[0] || {};
 
+            // Calculate today's metrics
             const operationsToday = parseInt(todayData.operations_count || 0);
             const winningToday = parseInt(todayData.winning_ops || 0);
+            const losingToday = parseInt(todayData.losing_ops || 0);
+            const neutralToday = parseInt(todayData.neutral_ops || 0);
             const todayPnL = parseFloat(todayData.total_pnl || 0);
+            const avgPnL = parseFloat(todayData.avg_pnl || 0);
+            const bestTrade = parseFloat(todayData.best_trade || 0);
+            const worstTrade = parseFloat(todayData.worst_trade || 0);
+            const totalVolume = parseFloat(todayData.total_volume || 0);
+            const openPositions = parseInt(openPositionsData.open_positions || 0);
+            const openValue = parseFloat(openPositionsData.open_value || 0);
 
-            const totalOperations = parseInt(allTimeData.total_operations || 0);
-            const totalWinning = parseInt(allTimeData.total_winning || 0);
+            // Calculate success rate
+            const totalClosed = winningToday + losingToday + neutralToday;
+            const todaySuccessRate = totalClosed > 0 ? (winningToday / totalClosed) * 100 : 0;
 
-            const todaySuccessRate = operationsToday > 0 ? (winningToday / operationsToday) * 100 : 0;
-            const overallSuccessRate = totalOperations > 0 ? (totalWinning / totalOperations) * 100 : 0;
-
-            const totalInvested = 10000;
+            // Calculate return percentage (based on total invested)
+            const totalInvested = 10000; // Default investment
             const todayReturnPercent = totalInvested > 0 ? (todayPnL / totalInvested) * 100 : 0;
 
-            console.log(`✅ Calculated daily stats from operations for user ${userId}`);
-            return {
+            // Calculate additional metrics
+            const winRate = totalClosed > 0 ? (winningToday / totalClosed) * 100 : 0;
+            const lossRate = totalClosed > 0 ? (losingToday / totalClosed) * 100 : 0;
+            const avgWin = winningToday > 0 ? todayPnL / winningToday : 0;
+            const avgLoss = losingToday > 0 ? Math.abs(todayPnL) / losingToday : 0;
+
+            const todayStats = {
                 operationsToday,
+                closedOperations: totalClosed,
+                openPositions,
                 successRate: Math.round(todaySuccessRate * 10) / 10,
-                historicalSuccessRate: Math.round(overallSuccessRate * 10) / 10,
+                winRate: Math.round(winRate * 10) / 10,
+                lossRate: Math.round(lossRate * 10) / 10,
                 todayReturnUSD: Math.round(todayPnL * 100) / 100,
                 todayReturnPercent: Math.round(todayReturnPercent * 100) / 100,
-                totalInvested: totalInvested
+                totalInvested,
+                
+                // Detailed metrics
+                winningTrades: winningToday,
+                losingTrades: losingToday,
+                neutralTrades: neutralToday,
+                bestTrade: Math.round(bestTrade * 100) / 100,
+                worstTrade: Math.round(worstTrade * 100) / 100,
+                avgPnL: Math.round(avgPnL * 100) / 100,
+                totalVolume: Math.round(totalVolume * 100) / 100,
+                openValue: Math.round(openValue * 100) / 100,
+                
+                // Calculated ratios
+                avgWin: Math.round(avgWin * 100) / 100,
+                avgLoss: Math.round(avgLoss * 100) / 100,
+                profitFactor: avgLoss > 0 ? Math.round((avgWin / avgLoss) * 100) / 100 : 0,
+                
+                // Timestamps
+                date: today.toISOString().split('T')[0], // YYYY-MM-DD format
+                lastUpdated: new Date().toISOString()
             };
 
+            console.log(`✅ Calculated TODAY'S stats for user ${userId}:`);
+            console.log(`   Operations: ${operationsToday} (${totalClosed} closed, ${openPositions} open)`);
+            console.log(`   Success Rate: ${todaySuccessRate.toFixed(1)}%`);
+            console.log(`   P&L: $${todayPnL.toFixed(2)} (${todayReturnPercent.toFixed(2)}%)`);
+            console.log(`   Best Trade: $${bestTrade.toFixed(2)}, Worst: $${worstTrade.toFixed(2)}`);
+
+            return todayStats;
+
         } catch (error) {
-            console.error('❌ Error fetching daily stats from database:', error);
+            console.error('❌ Error fetching today\'s stats from database:', error);
             return {
                 operationsToday: 0,
+                closedOperations: 0,
+                openPositions: 0,
                 successRate: 0,
-                historicalSuccessRate: 0,
+                winRate: 0,
+                lossRate: 0,
                 todayReturnUSD: 0,
                 todayReturnPercent: 0,
-                totalInvested: 10000
+                totalInvested: 10000,
+                winningTrades: 0,
+                losingTrades: 0,
+                neutralTrades: 0,
+                bestTrade: 0,
+                worstTrade: 0,
+                avgPnL: 0,
+                totalVolume: 0,
+                openValue: 0,
+                avgWin: 0,
+                avgLoss: 0,
+                profitFactor: 0,
+                date: new Date().toISOString().split('T')[0],
+                lastUpdated: new Date().toISOString()
             };
         }
-    }
-
-    /**
-     * Get top 10 TradingView signals from database
-     * These are raw signals from TradingView webhooks (not executed trades)
-     */
-    async getTopProcessSignals() {
-        try {
-            console.log('📡 Fetching top 10 TradingView signals from database...');
-
-            if (!this.pool) {
-                console.log('⚠️ No database connection, returning empty top signals');
-                return [];
-            }
-
-            // Query trading_signals table (TradingView webhook alerts)
-            const result = await this.pool.query(`
-                SELECT
-                    signal_id as id,
-                    symbol as pair,
-                    action as direction,
-                    85 as confidence,
-                    price as "entryPrice",
-                    price as "currentPrice",
-                    COALESCE(quantity, 0) as quantity,
-                    0 as pnl,
-                    0 as "pnlPercent",
-                    received_at as timestamp,
-                    'PROCESSANDO' as status,
-                    COALESCE(strategy, 'TradingView Signal') as reasoning,
-                    source
-                FROM trading_signals
-                WHERE received_at >= NOW() - INTERVAL '24 hours'
-                ORDER BY received_at DESC
-                LIMIT 10
-            `);
-
-            // Enrich signals with real-time prices and P&L
-            const enrichedSignals = [];
-            for (const [index, row] of result.rows.entries()) {
-                const entryPrice = parseFloat(row.entryPrice) || 0;
-                let currentPrice = entryPrice;
-                let pnl = 0;
-                let pnlPercent = 0;
-                let quantity = parseFloat(row.quantity) || 0.01; // Default quantity for display
-
-                // Fetch real-time price from Binance
-                try {
-                    const priceData = await this.binanceService.getSymbolPrice(row.pair);
-                    if (priceData.success && priceData.price) {
-                        currentPrice = parseFloat(priceData.price);
-
-                        // Calculate P&L based on direction
-                        if (row.direction === 'BUY' || row.direction === 'LONG') {
-                            pnl = (currentPrice - entryPrice) * quantity;
-                            pnlPercent = ((currentPrice - entryPrice) / entryPrice) * 100;
-                        } else { // SELL or SHORT
-                            pnl = (entryPrice - currentPrice) * quantity;
-                            pnlPercent = ((entryPrice - currentPrice) / entryPrice) * 100;
-                        }
-                    }
-                } catch (priceError) {
-                    console.warn(`Could not fetch price for ${row.pair}:`, priceError.message);
-                }
-
-                // Determine performance based on P&L
-                let performance = 'MEDIUM';
-                if (pnlPercent > 2) performance = 'HIGH';
-                else if (pnlPercent < -1) performance = 'LOW';
-
-                enrichedSignals.push({
-                    rank: index + 1,
-                    id: row.id,
-                    pair: row.pair,
-                    direction: row.direction,
-                    confidence: parseInt(row.confidence) || 85,
-                    entryPrice: entryPrice,
-                    currentPrice: currentPrice,
-                    quantity: quantity,
-                    pnl: Math.round(pnl * 100) / 100,
-                    pnlPercent: Math.round(pnlPercent * 100) / 100,
-                    status: 'PROCESSANDO',
-                    timestamp: row.timestamp,
-                    reasoning: row.reasoning || 'TradingView Signal',
-                    source: row.source || 'TRADINGVIEW',
-                    stopLoss: null,
-                    takeProfit: null,
-                    userId: 'global',
-                    performance: performance,
-                    activity: 'ACTIVE'
-                });
-            }
-
-            const topSignals = enrichedSignals;
-
-            console.log(`✅ Fetched ${topSignals.length} TradingView signals from database`);
-            return topSignals;
-
-        } catch (error) {
-            console.error('❌ Error fetching TradingView signals from database:', error);
-            // Return empty array instead of failing
-            return [];
-        }
-    }
-
-    /**
-     * Generate demo top signals when no real data is available
-     */
-    generateDemoTopSignals() {
-        const cryptoPairs = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'MATICUSDT', 'DOTUSDT', 'LINKUSDT', 'UNIUSDT', 'AVAXUSDT', 'ATOMUSDT'];
-        const directions = ['LONG', 'SHORT'];
-        const statuses = ['PROCESSANDO', 'APROVADO', 'EXECUTADO'];
-        const reasonings = [
-            'AI detectou padrão de alta com 94% confiança',
-            'Breakout confirmado + volume excepcional',
-            'Reversão bullish identificada pelo algoritmo',
-            'Momentum forte + indicadores alinhados',
-            'Padrão harmônico completado',
-            'Suporte forte testado com sucesso',
-            'Divergência positiva confirmada',
-            'Canal ascendente rompido para cima',
-            'RSI oversold + sinais de reversão',
-            'Fibonacci + volume crescente'
-        ];
-
-        return Array.from({ length: 10 }, (_, index) => {
-            const pair = cryptoPairs[index] || cryptoPairs[Math.floor(Math.random() * cryptoPairs.length)];
-            const direction = directions[Math.floor(Math.random() * directions.length)];
-            const confidence = Math.floor(Math.random() * 25) + 70; // 70-95
-            const pnlPercent = (Math.random() - 0.3) * 10; // -3% to +7%
-            const pnl = pnlPercent * (Math.random() * 1000 + 500); // Random position size
-            const entryPrice = 50000 + Math.random() * 20000; // Random BTC-like price
-            const currentPrice = entryPrice * (1 + pnlPercent / 100);
-
-            return {
-                rank: index + 1,
-                id: `DEMO_${index + 1}`,
-                pair,
-                direction,
-                confidence,
-                entryPrice: Math.round(entryPrice * 100) / 100,
-                currentPrice: Math.round(currentPrice * 100) / 100,
-                quantity: +(Math.random() * 0.5 + 0.1).toFixed(3),
-                pnl: Math.round(pnl * 100) / 100,
-                pnlPercent: Math.round(pnlPercent * 100) / 100,
-                status: statuses[Math.floor(Math.random() * statuses.length)],
-                timestamp: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000), // Random time in last 24h
-                reasoning: reasonings[index] || reasonings[Math.floor(Math.random() * reasonings.length)],
-                source: 'AI',
-                stopLoss: null,
-                takeProfit: null,
-                userId: 'demo',
-                performance: pnl > 0 ? 'HIGH' : pnl > -100 ? 'MEDIUM' : 'LOW',
-                activity: Math.random() > 0.5 ? 'ACTIVE' : 'MONITORING'
-            };
-        }).sort((a, b) => b.pnlPercent - a.pnlPercent); // Sort by performance
-    }
-
-    /**
-     * Calculate signal performance rating
-     */
-    calculateSignalPerformance(pnl, pnlPercent) {
-        if (pnl > 100 || pnlPercent > 5) return 'HIGH';
-        if (pnl > 0 || pnlPercent > 0) return 'MEDIUM';
-        return 'LOW';
-    }
-
-    /**
-     * Calculate signal activity status
-     */
-    calculateSignalActivity(timestamp) {
-        const now = new Date();
-        const signalTime = new Date(timestamp);
-        const hoursDiff = (now - signalTime) / (1000 * 60 * 60);
-
-        if (hoursDiff < 1) return 'ACTIVE';
-        if (hoursDiff < 6) return 'MONITORING';
-        return 'COMPLETED';
     }
 
     /**

@@ -26,7 +26,6 @@ class OperationsRoutes {
 
     setupRoutes() {
         // Test endpoints (no auth required)
-        this.router.get('/top-signals-test', this.getTopSignalsTest.bind(this));
 
         // All other routes require authentication
         this.router.use(this.authMiddleware.authenticate.bind(this.authMiddleware));
@@ -38,10 +37,6 @@ class OperationsRoutes {
         this.router.get('/positions', this.getPositions.bind(this));
         this.router.get('/daily-stats', this.getDailyStats.bind(this));
         this.router.get('/all', this.getAllOperationsData.bind(this));
-
-        // Top signals
-        this.router.get('/top-signals', this.getTopSignals.bind(this));
-
 
         // Signal generation
         this.router.post('/generate-signal', this.generateNewSignal.bind(this));
@@ -96,7 +91,8 @@ class OperationsRoutes {
     }
 
     /**
-     * GET /signals - Get trading signals
+     * GET /signals - Get trading signals (real-time via WebSocket only)
+     * NOTE: This endpoint returns empty array - signals come via WebSocket from TradingView webhook
      */
     async getTradingSignals(req, res) {
         try {
@@ -109,7 +105,11 @@ class OperationsRoutes {
                 success: true,
                 data: signals,
                 count: signals.length,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                message: 'Real-time signals come via WebSocket from TradingView webhook',
+                note: 'Frontend should listen to WebSocket events: trading_signal and signal_update',
+                webSocketEvents: ['trading_signal', 'signal_update'],
+                webSocketEndpoint: 'ws://localhost:3333'
             });
         } catch (error) {
             console.error('❌ Trading signals error:', error);
@@ -121,52 +121,6 @@ class OperationsRoutes {
         }
     }
 
-    /**
-     * GET /top-signals - Get top 10 process signals
-     */
-    async getTopSignals(req, res) {
-        try {
-            const topSignals = await this.realOperationsService.getTopProcessSignals();
-
-            res.json({
-                success: true,
-                data: topSignals,
-                count: topSignals.length,
-                timestamp: new Date().toISOString()
-            });
-        } catch (error) {
-            console.error('❌ Top signals error:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Erro ao obter top 10 sinais',
-                code: 'TOP_SIGNALS_ERROR'
-            });
-        }
-    }
-
-    /**
-     * GET /top-signals-test - Test endpoint for top 10 process signals (no auth)
-     */
-    async getTopSignalsTest(req, res) {
-        try {
-            const topSignals = await this.realOperationsService.getTopProcessSignals();
-
-            res.json({
-                success: true,
-                data: topSignals,
-                count: topSignals.length,
-                timestamp: new Date().toISOString(),
-                message: 'Top 10 process signals retrieved successfully'
-            });
-        } catch (error) {
-            console.error('❌ Top signals test error:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Erro ao obter top 10 sinais (test)',
-                code: 'TOP_SIGNALS_TEST_ERROR'
-            });
-        }
-    }
 
     /**
      * GET /positions - Get user positions

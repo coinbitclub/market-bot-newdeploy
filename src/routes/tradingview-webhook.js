@@ -23,7 +23,7 @@ class TradingViewWebhookRoutes {
 
         // Test endpoint to validate webhook format
         this.router.post('/test', this.testWebhookFormat.bind(this));
-
+        
         // Webhook status and configuration
         this.router.get('/status', this.getWebhookStatus.bind(this));
     }
@@ -62,8 +62,14 @@ class TradingViewWebhookRoutes {
 
             // ✅ STEP 1: INSTANT WebSocket Broadcast (PRIMARY - don't wait)
             const tradingWebSocket = require('../services/websocket/trading-websocket');
+            
+            // Broadcast to trading bots and frontend
             tradingWebSocket.broadcastTradingSignal(signal);
-            console.log('📡 Signal broadcasted via WebSocket instantly');
+            console.log('📡 TradingView signal broadcasted to trading bots and frontend');
+            
+            // Also broadcast as signal_received for operations page
+            tradingWebSocket.broadcastSignalReceived(signal);
+            console.log('📡 Signal received event broadcasted to operations page');
 
             // ✅ STEP 2: ASYNC Save to database (don't block response)
             this.saveSignalToDatabase(signal).catch(err =>

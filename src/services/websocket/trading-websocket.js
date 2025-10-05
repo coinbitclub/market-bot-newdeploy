@@ -21,7 +21,7 @@ class TradingWebSocket {
     initialize(httpServer) {
         this.io = new Server(httpServer, {
             cors: {
-                origin: ["http://localhost:3003", "http://localhost:3004", "http://localhost:3000"],
+                origin: ["*"],
                 methods: ["GET", "POST"],
                 credentials: true
             },
@@ -463,10 +463,48 @@ class TradingWebSocket {
      * Broadcast new TradingView signal to ALL users (real-time)
      * This is called when TradingView webhook receives a signal
      */
-    broadcastTradingSignal(signal) {
+    async broadcastTradingSignal(signal) {
         if (!this.isInitialized) {
             console.warn('⚠️ WebSocket not initialized, cannot broadcast signal');
             return;
+        }
+
+        // Get real-time price for the signal
+        let currentPrice = signal.price || 0;
+        let pnl = 0;
+        let pnlPercent = 0;
+        let status = 'PROCESSANDO';
+
+        try {
+            // Import Binance service to get real-time price
+            const BinanceService = require('../exchange/binance-service');
+            const binanceService = new BinanceService();
+            
+            const priceData = await binanceService.getSymbolPrice(signal.symbol || signal.pair);
+            if (priceData.success && priceData.price) {
+                currentPrice = parseFloat(priceData.price);
+                
+                // Calculate P&L if entry price is available
+                if (signal.price && signal.price > 0) {
+                    const entryPrice = parseFloat(signal.price);
+                    const quantity = parseFloat(signal.quantity) || 0.01;
+                    
+                    if (signal.action === 'BUY' || signal.action === 'LONG') {
+                        pnl = (currentPrice - entryPrice) * quantity;
+                        pnlPercent = ((currentPrice - entryPrice) / entryPrice) * 100;
+                    } else { // SELL or SHORT
+                        pnl = (entryPrice - currentPrice) * quantity;
+                        pnlPercent = ((entryPrice - currentPrice) / entryPrice) * 100;
+                    }
+                    
+                    // Determine status based on performance
+                    if (pnlPercent > 2) status = 'EXECUTADO';
+                    else if (pnlPercent < -2) status = 'DESCARTADO';
+                    else status = 'APROVADO';
+                }
+            }
+        } catch (priceError) {
+            console.warn(`⚠️ Could not fetch real-time price for ${signal.symbol}:`, priceError.message);
         }
 
         const signalData = {
@@ -476,11 +514,15 @@ class TradingWebSocket {
                 pair: signal.symbol || signal.pair,
                 direction: signal.action || signal.direction,
                 price: signal.price,
-                quantity: signal.quantity,
+                currentPrice: currentPrice,
+                quantity: signal.quantity || 0.01,
                 strategy: signal.strategy || signal.alert_name || 'TradingView Signal',
                 source: 'TRADINGVIEW',
                 confidence: 85, // Default confidence for TradingView signals
                 timestamp: new Date().toISOString(),
+                status: status,
+                pnl: Math.round(pnl * 100) / 100,
+                pnlPercent: Math.round(pnlPercent * 100) / 100,
                 // Additional metadata
                 interval: signal.interval || signal.timeframe,
                 stop_loss: signal.stop_loss,
@@ -489,33 +531,17 @@ class TradingWebSocket {
             timestamp: new Date().toISOString()
         };
 
-        // Broadcast to ALL connected clients (not just specific user)
+        // Broadcast to ALL connected clients (trading bots and frontend)
         this.io.emit('trading_signal', signalData);
+        
+        // Also broadcast as signal_update for operations page
+        this.io.emit('signal_update', {
+            type: 'signal_update',
+            data: signalData.data,
+            timestamp: signalData.timestamp
+        });
 
-        console.log(`📊 TradingView signal broadcasted to ALL users: ${signal.symbol} ${signal.action} @ ${signal.price || 'market'}`);
-    }
-
-    /**
-     * Broadcast signal received event (for monitoring/analytics)
-     */
-    broadcastSignalReceived(signal) {
-        if (!this.isInitialized) return;
-
-        const signalReceivedData = {
-            type: 'signal_received',
-            data: {
-                symbol: signal.symbol,
-                action: signal.action,
-                source: signal.source || 'TRADINGVIEW',
-                timestamp: new Date().toISOString()
-            },
-            timestamp: new Date().toISOString()
-        };
-
-        // Broadcast to all connected clients
-        this.io.emit('signal_received', signalReceivedData);
-
-        console.log(`📡 Signal received event broadcasted: ${signal.symbol} ${signal.action}`);
+        console.log(`📊 TradingView signal broadcasted to ALL users: ${signal.symbol} ${signal.action} @ ${signal.price || 'market'} (Status: ${status})`);
     }
 
     /**
