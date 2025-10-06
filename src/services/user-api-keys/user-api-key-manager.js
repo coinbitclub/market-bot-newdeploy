@@ -105,6 +105,16 @@ class UserAPIKeyManager {
             // Decrypt the API secret
             const apiSecret = apiKeyEncryption.decrypt(row.api_secret);
 
+            // If decryption failed, return error but don't crash
+            if (apiSecret === null) {
+                console.warn(`⚠️ API key decryption failed for user ${userId}, exchange ${exchange}`);
+                return {
+                    success: false,
+                    error: 'API key decryption failed - key may be corrupted',
+                    needsReentry: true
+                };
+            }
+
             return {
                 success: true,
                 apiKey: row.api_key,
@@ -113,10 +123,11 @@ class UserAPIKeyManager {
             };
 
         } catch (error) {
-            console.error(`❌ Error retrieving API key:`, error);
+            console.warn(`⚠️ Error retrieving API key:`, error.message);
             return {
                 success: false,
-                error: 'Failed to retrieve API key'
+                error: 'Failed to retrieve API key',
+                needsReentry: true
             };
         }
     }

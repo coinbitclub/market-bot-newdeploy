@@ -545,6 +545,117 @@ class TradingWebSocket {
     }
 
     /**
+     * Broadcast affiliate commission update
+     */
+    broadcastAffiliateCommission(userId, commissionData) {
+        if (!this.isInitialized) {
+            console.warn('⚠️ WebSocket not initialized, cannot broadcast affiliate commission');
+            return;
+        }
+
+        const commissionUpdate = {
+            type: 'affiliate_commission_update',
+            data: {
+                affiliateId: commissionData.affiliateId,
+                amount: commissionData.amount,
+                source: commissionData.source || 'trading',
+                description: commissionData.description,
+                timestamp: new Date().toISOString()
+            }
+        };
+
+        // Send to specific affiliate user
+        this.io.to(`user_${userId}`).emit('affiliate_commission_update', commissionUpdate);
+        
+        // Also send to admin users
+        this.adminSockets.forEach(adminSocket => {
+            adminSocket.emit('affiliate_commission_update', commissionUpdate);
+        });
+
+        console.log(`💰 Affiliate commission broadcasted: $${commissionData.amount.toFixed(2)} to affiliate ${userId}`);
+    }
+
+    /**
+     * Broadcast affiliate balance update
+     */
+    broadcastAffiliateBalanceUpdate(userId, balanceData) {
+        if (!this.isInitialized) {
+            console.warn('⚠️ WebSocket not initialized, cannot broadcast affiliate balance update');
+            return;
+        }
+
+        const balanceUpdate = {
+            type: 'affiliate_balance_update',
+            data: {
+                currentBalance: balanceData.currentBalance,
+                totalEarnings: balanceData.totalEarnings,
+                pendingCommissions: balanceData.pendingCommissions,
+                timestamp: new Date().toISOString()
+            }
+        };
+
+        // Send to specific affiliate user
+        this.io.to(`user_${userId}`).emit('affiliate_balance_update', balanceUpdate);
+
+        console.log(`💳 Affiliate balance update broadcasted to user ${userId}: $${balanceData.currentBalance.toFixed(2)}`);
+    }
+
+    /**
+     * Broadcast new referral notification
+     */
+    broadcastNewReferral(affiliateId, referralData) {
+        if (!this.isInitialized) {
+            console.warn('⚠️ WebSocket not initialized, cannot broadcast new referral');
+            return;
+        }
+
+        const referralNotification = {
+            type: 'new_referral',
+            data: {
+                referredUserId: referralData.referredUserId,
+                referredUserName: referralData.referredUserName,
+                referralCode: referralData.referralCode,
+                timestamp: new Date().toISOString()
+            }
+        };
+
+        // Send to specific affiliate user
+        this.io.to(`user_${affiliateId}`).emit('new_referral', referralNotification);
+        
+        // Also send to admin users
+        this.adminSockets.forEach(adminSocket => {
+            adminSocket.emit('new_referral', referralNotification);
+        });
+
+        console.log(`👥 New referral notification broadcasted to affiliate ${affiliateId}: ${referralData.referredUserName}`);
+    }
+
+    /**
+     * Broadcast commission paid notification
+     */
+    broadcastCommissionPaid(userId, paymentData) {
+        if (!this.isInitialized) {
+            console.warn('⚠️ WebSocket not initialized, cannot broadcast commission paid');
+            return;
+        }
+
+        const paymentNotification = {
+            type: 'commission_paid',
+            data: {
+                amount: paymentData.amount,
+                paymentMethod: paymentData.paymentMethod,
+                transactionId: paymentData.transactionId,
+                timestamp: new Date().toISOString()
+            }
+        };
+
+        // Send to specific affiliate user
+        this.io.to(`user_${userId}`).emit('commission_paid', paymentNotification);
+
+        console.log(`💸 Commission paid notification broadcasted to user ${userId}: $${paymentData.amount.toFixed(2)}`);
+    }
+
+    /**
      * Get connection statistics
      */
     getConnectionStats() {

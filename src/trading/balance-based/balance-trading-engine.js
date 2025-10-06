@@ -10,6 +10,7 @@ const MarketAnalyzer = require('../enterprise/market-analyzer');
 const tradingWebSocket = require('../../services/websocket/trading-websocket');
 const PnLDistributionService = require('../../services/pnl/pnl-distribution-service');
 const PositionTracker = require('../../services/position/position-tracker');
+const RealAffiliateService = require('../../services/affiliate/real-affiliate-service');
 
 class BalanceTradingEngine {
     constructor(dbPoolManager) {
@@ -20,6 +21,8 @@ class BalanceTradingEngine {
         this.marketAnalyzer = new MarketAnalyzer();
         this.pnlDistributionService = new PnLDistributionService(dbPoolManager);
         this.positionTracker = new PositionTracker(dbPoolManager, this.pnlDistributionService, tradingWebSocket);
+        this.affiliateService = new RealAffiliateService();
+        this.affiliateService.setDbPoolManager(dbPoolManager);
 
         // Plan-based execution priorities
         this.PLAN_PRIORITIES = {
@@ -264,6 +267,27 @@ class BalanceTradingEngine {
                 await this.saveTradeExecution(signal.tradeId || `TRADE_${Date.now()}`, tradeData);
 
                 if (tradeResult.success) {
+                    // Calculate affiliate commission for successful trade
+                    try {
+                        console.log(`🤝 Calculating affiliate commission for user ${user.id}...`);
+                        const affiliateCommission = await this.affiliateService.calculateTradingCommission(user.id, positionSize);
+                        if (affiliateCommission) {
+                            console.log(`💰 Affiliate commission calculated: $${affiliateCommission.commission.toFixed(2)} for affiliate ${affiliateCommission.affiliateId}`);
+                            
+                            // Broadcast affiliate commission update via WebSocket
+                            tradingWebSocket.broadcastAffiliateCommission(affiliateCommission.affiliateId, {
+                                affiliateId: affiliateCommission.affiliateId,
+                                amount: affiliateCommission.commission,
+                                source: 'trading',
+                                description: `Trading commission from ${user.username} - ${signal.symbol} ${aiDecision.action}`
+                            });
+                        } else {
+                            console.log(`ℹ️ No affiliate commission - user ${user.id} was not referred by an affiliate`);
+                        }
+                    } catch (error) {
+                        console.error(`❌ Error calculating affiliate commission for user ${user.id}:`, error);
+                    }
+
                     // Update user balance with trade result
                     await this.updateUserBalanceAfterTrade(user.id, tradeResult, planConfig.commission);
                 }

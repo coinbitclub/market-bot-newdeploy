@@ -72,13 +72,15 @@ class APIKeyEncryption {
     decrypt(encryptedData) {
         try {
             if (!encryptedData) {
-                throw new Error('Cannot decrypt empty value');
+                console.warn('⚠️ Cannot decrypt empty value');
+                return null;
             }
 
             // Split the encrypted data
             const parts = encryptedData.split(':');
             if (parts.length !== 3) {
-                throw new Error('Invalid encrypted data format');
+                console.warn('⚠️ Invalid encrypted data format');
+                return null;
             }
 
             const iv = Buffer.from(parts[0], 'hex');
@@ -96,8 +98,8 @@ class APIKeyEncryption {
             return decrypted;
 
         } catch (error) {
-            console.error('❌ Decryption error:', error.message);
-            throw new Error('Failed to decrypt API secret');
+            console.warn('⚠️ Decryption failed, API key may be corrupted or encryption key changed:', error.message);
+            return null; // Return null instead of throwing error
         }
     }
 
