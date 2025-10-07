@@ -165,8 +165,10 @@ class UserAPIKeyManager {
             // Test the API key by fetching account info
             let testResult;
             if (exchange.toLowerCase() === 'bybit') {
-                testResult = await exchangeService.getAccountBalance();
-            } else {
+                // Use getAccountInfo for Bybit (returns account details)
+                testResult = await exchangeService.getAccountInfo();
+            } else if (exchange.toLowerCase() === 'binance') {
+                // Use getAccountInfo for Binance
                 testResult = await exchangeService.getAccountInfo();
             }
 

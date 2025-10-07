@@ -41,9 +41,10 @@ class BinanceService {
             const timestamp = Date.now();
             const queryString = new URLSearchParams({
                 ...params,
-                timestamp
+                timestamp,
+                recvWindow: 60000  // Allow 60 second time difference for clock sync issues
             }).toString();
-            
+
             const signature = this.generateSignature(queryString);
             const url = `${this.authenticatedURL}${endpoint}?${queryString}&signature=${signature}`;
 

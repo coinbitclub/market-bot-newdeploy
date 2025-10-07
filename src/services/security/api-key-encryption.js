@@ -78,6 +78,14 @@ class APIKeyEncryption {
 
             // Split the encrypted data
             const parts = encryptedData.split(':');
+
+            // Handle legacy format (2 parts: iv:encrypted) from old createCipher
+            if (parts.length === 2) {
+                console.warn('⚠️ Decrypting API key with legacy format - please re-encrypt for better security');
+                return this.decryptLegacy(encryptedData);
+            }
+
+            // Handle new format (3 parts: iv:encrypted:authTag)
             if (parts.length !== 3) {
                 console.warn('⚠️ Invalid encrypted data format');
                 return null;
@@ -100,6 +108,33 @@ class APIKeyEncryption {
         } catch (error) {
             console.warn('⚠️ Decryption failed, API key may be corrupted or encryption key changed:', error.message);
             return null; // Return null instead of throwing error
+        }
+    }
+
+    /**
+     * Decrypt legacy format (from old createCipher method)
+     * @param {string} encryptedData - Old format encrypted string (iv:encrypted)
+     * @returns {string} Decrypted API secret
+     */
+    decryptLegacy(encryptedData) {
+        try {
+            const parts = encryptedData.split(':');
+            const iv = Buffer.from(parts[0], 'hex');
+            const encrypted = parts[1];
+
+            // Use aes-256-cbc for legacy decryption (old createCipher equivalent)
+            const decipher = crypto.createDecipheriv('aes-256-cbc', this.encryptionKey, iv);
+
+            // Decrypt
+            let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+
+            console.log('✅ Successfully decrypted legacy API key');
+            return decrypted;
+
+        } catch (error) {
+            console.error('❌ Legacy decryption failed:', error.message);
+            return null;
         }
     }
 
