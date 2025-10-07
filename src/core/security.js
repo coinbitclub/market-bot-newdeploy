@@ -95,7 +95,8 @@ class SecurityConfig {
     // Configuração do CORS
     getCorsConfig() {
         // Read from environment or use development defaults
-        const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || [
+        // Remove trailing slashes to avoid CORS issues
+        const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim().replace(/\/$/, '')) || [
             'http://localhost:3000',
             'http://localhost:3003',
             'https://market-bot-frontend.vercel.app'
@@ -114,11 +115,14 @@ class SecurityConfig {
                     return callback(null, true);
                 }
 
+                // Normalize origin by removing trailing slash
+                const normalizedOrigin = origin.replace(/\/$/, '');
+
                 // Em produção, verificar lista de origens permitidas
-                if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+                if (allowedOrigins.includes(normalizedOrigin) || allowedOrigins.includes('*')) {
                     callback(null, true);
                 } else {
-                    logger.warn('CORS blocked request', { origin, allowedOrigins });
+                    logger.warn('CORS blocked request', { origin: normalizedOrigin, allowedOrigins });
                     callback(new Error('Não permitido pelo CORS'));
                 }
             },
