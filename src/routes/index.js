@@ -46,6 +46,7 @@ const setDbPoolManager = (dbPoolManager) => {
     operationsRoutes.setDbPoolManager(dbPoolManager);
     userAPIKeysRoutes.setDbPoolManager(dbPoolManager);
     affiliateRoutes.setDbPoolManager(dbPoolManager);
+    adminRoutes.setDbPoolManager(dbPoolManager);
 
     // Connect affiliate service to auth routes for referral tracking
     if (affiliateRoutes.affiliateService) {

@@ -7,10 +7,13 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const http = require('http');
+const morgan = require('morgan');
 
 const { router: ApiRoutes, setDbPoolManager } = require('./routes/index');
 const ConnectionPoolManager = require('./database/connection-pool-manager');
 const tradingWebSocket = require('./services/websocket/trading-websocket');
+const { SecurityConfig } = require('./core/security');
+const { ErrorHandler } = require('./middleware/error-handler');
 
 class CoinBitClubEnterpriseSystem {
     constructor() {
@@ -19,6 +22,9 @@ class CoinBitClubEnterpriseSystem {
 
         // Create HTTP server for WebSocket support
         this.httpServer = http.createServer(this.app);
+
+        // Initialize security configuration
+        this.security = new SecurityConfig();
 
         // Initialize database pool manager
         this.dbPoolManager = new ConnectionPoolManager();
@@ -34,18 +40,36 @@ class CoinBitClubEnterpriseSystem {
         this.setupErrorHandling();
         console.log('🔧 Configurando WebSocket...');
         this.setupWebSocket();
+        console.log('🔧 Configurando process error handlers...');
+        this.setupProcessErrorHandlers();
 
         console.log('🏗️ CoinBitClub Enterprise System iniciado');
     }
 
     setupMiddleware() {
-        this.app.use(helmet());
-        this.app.use(cors());
-        
+        // Security headers
+        this.app.use(this.security.getHelmetConfig());
+
+        // CORS configuration
+        this.app.use(this.security.getCorsConfig());
+
+        // Request logging (Morgan)
+        const logFormat = process.env.NODE_ENV === 'production' ? 'combined' : 'dev';
+        this.app.use(morgan(logFormat));
+
+        // IP validation middleware
+        this.app.use(this.security.ipValidationMiddleware());
+
+        // Global rate limiting (general API)
+        this.app.use(this.security.getRateLimiter('general'));
+
         // Skip JSON parsing for Stripe webhook to preserve raw body for signature verification
         this.app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
-        this.app.use(express.json());
-        this.app.use(express.urlencoded({ extended: true }));
+        this.app.use(express.json({ limit: '10mb' }));
+        this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+        // Trust proxy (for rate limiting with correct IPs)
+        this.app.set('trust proxy', 1);
     }
 
     setupRoutes() {
@@ -92,13 +116,80 @@ class CoinBitClubEnterpriseSystem {
     }
 
     setupErrorHandling() {
-        this.app.use((err, req, res, next) => {
-            console.error('❌ Erro no sistema:', err.message);
-            res.status(500).json({
-                error: 'Erro interno do servidor',
-                timestamp: new Date().toISOString()
-            });
+        // 404 handler (must be after all routes)
+        this.app.use(ErrorHandler.notFound());
+
+        // Centralized error handler (must be last)
+        this.app.use(ErrorHandler.handle());
+    }
+
+    setupProcessErrorHandlers() {
+        // Handle unhandled promise rejections
+        process.on('unhandledRejection', (reason, promise) => {
+            console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+            // Log to error tracking service (Sentry, etc.)
+            // In production, might want to gracefully shutdown
+            if (process.env.NODE_ENV === 'production') {
+                console.error('🚨 Critical: Unhandled rejection in production');
+                // Optional: this.gracefulShutdown();
+            }
         });
+
+        // Handle uncaught exceptions
+        process.on('uncaughtException', (error) => {
+            console.error('❌ Uncaught Exception:', error);
+            // Log to error tracking service
+            // In production, should gracefully shutdown
+            if (process.env.NODE_ENV === 'production') {
+                console.error('🚨 Critical: Uncaught exception in production - shutting down');
+                this.gracefulShutdown(1);
+            }
+        });
+
+        // Handle SIGTERM (production graceful shutdown)
+        process.on('SIGTERM', () => {
+            console.log('📡 SIGTERM received - starting graceful shutdown');
+            this.gracefulShutdown(0);
+        });
+
+        // Handle SIGINT (Ctrl+C)
+        process.on('SIGINT', () => {
+            console.log('📡 SIGINT received - starting graceful shutdown');
+            this.gracefulShutdown(0);
+        });
+    }
+
+    async gracefulShutdown(exitCode = 0) {
+        console.log('🛑 Graceful shutdown initiated...');
+
+        try {
+            // Stop accepting new connections
+            if (this.server) {
+                await new Promise((resolve) => {
+                    this.server.close(resolve);
+                    console.log('✅ HTTP server closed');
+                });
+            }
+
+            // Close database connections
+            if (this.dbPoolManager) {
+                await this.dbPoolManager.closeAll();
+                console.log('✅ Database connections closed');
+            }
+
+            // Close WebSocket connections
+            if (tradingWebSocket && tradingWebSocket.io) {
+                tradingWebSocket.io.close();
+                console.log('✅ WebSocket server closed');
+            }
+
+            console.log('✅ Graceful shutdown complete');
+            process.exit(exitCode);
+
+        } catch (error) {
+            console.error('❌ Error during graceful shutdown:', error);
+            process.exit(1);
+        }
     }
 
     setupWebSocket() {

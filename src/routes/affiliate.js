@@ -369,7 +369,8 @@ class AffiliateRoutes {
     }
 
     /**
-     * POST /withdraw - Request withdrawal
+     * POST /withdraw - Request withdrawal with fraud detection
+     * Phase 2: Enhanced with risk scoring and auto-approval
      */
     async requestWithdrawal(req, res) {
         try {
@@ -408,27 +409,98 @@ class AffiliateRoutes {
                 });
             }
 
+            // Import fraud detection functions
+            const { calculateRiskScore, checkFraudRules, getRiskLevel } = require('../middleware/admin-withdrawal-approval');
+
+            // Run fraud detection
+            const fraudCheck = await checkFraudRules(affiliate.id, amount, this.pool);
+
+            if (!fraudCheck.passed) {
+                const { affiliateLogger } = require('../config/winston.config');
+                affiliateLogger.warn('Withdrawal request blocked by fraud detection', {
+                    userId,
+                    affiliateId: affiliate.id,
+                    amount,
+                    violations: fraudCheck.violations
+                });
+
+                return res.status(400).json({
+                    success: false,
+                    error: 'Withdrawal request cannot be processed',
+                    violations: fraudCheck.violations.map(v => v.message)
+                });
+            }
+
+            // Calculate risk score
+            const riskScore = await calculateRiskScore(affiliate.id, amount, this.pool);
+            const riskLevel = getRiskLevel(riskScore);
+
+            // Determine initial status based on risk
+            let initialStatus = 'pending';
+            let autoApproved = false;
+
+            // Auto-approve low-risk withdrawals
+            if (riskScore < 20 && method === 'PIX' && amount <= 1000) {
+                initialStatus = 'approved';
+                autoApproved = true;
+            }
+
             // Calculate fees
-            const feeRate = method === 'PIX' ? 0.005 : 0.01;
+            const feeRate = method === 'PIX' ? 0.005 : 0.01; // 0.5% for PIX, 1% for bank transfer
             const fees = amount * feeRate;
             const netAmount = amount - fees;
 
-            // Create withdrawal request
-            const result = await this.pool.executeWrite(`
-                INSERT INTO affiliate_withdrawals (
-                    affiliate_id, amount, method, fees, net_amount, status, created_at
-                ) VALUES ($1, $2, $3, $4, $5, 'pending', NOW())
-                RETURNING *
-            `, [affiliate.id, amount, method, fees, netAmount]);
+            // Start transaction for data consistency
+            await this.pool.executeWrite('BEGIN');
 
-            // Reserve amount from balance
-            await this.pool.executeWrite(`
-                UPDATE affiliates
-                SET current_balance = current_balance - $1
-                WHERE id = $2
-            `, [amount, affiliate.id]);
+            let result;
+            try {
+                // Create withdrawal request
+                result = await this.pool.executeWrite(`
+                    INSERT INTO affiliate_withdrawals (
+                        affiliate_id, amount, method, fees, net_amount, status,
+                        risk_score, created_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                    RETURNING *
+                `, [affiliate.id, amount, method, fees, netAmount, initialStatus, riskScore]);
 
-            console.log(`✅ Withdrawal requested: Affiliate ${affiliate.id}, Amount: $${amount}, Method: ${method}`);
+                // Reserve amount from balance
+                await this.pool.executeWrite(`
+                    UPDATE affiliates
+                    SET current_balance = current_balance - $1
+                    WHERE id = $2
+                `, [amount, affiliate.id]);
+
+                // Commit transaction
+                await this.pool.executeWrite('COMMIT');
+
+            } catch (dbError) {
+                // Rollback on any error
+                await this.pool.executeWrite('ROLLBACK');
+
+                const { affiliateLogger } = require('../config/winston.config');
+                affiliateLogger.error('Error creating withdrawal request', {
+                    userId,
+                    affiliateId: affiliate.id,
+                    amount,
+                    error: dbError.message
+                });
+
+                throw dbError;
+            }
+
+            const { affiliateLogger } = require('../config/winston.config');
+            affiliateLogger.info('Withdrawal requested', {
+                userId,
+                affiliateId: affiliate.id,
+                withdrawalId: result.rows[0].id,
+                amount,
+                method,
+                riskScore,
+                riskLevel,
+                autoApproved,
+                initialStatus
+            });
 
             res.json({
                 success: true,
@@ -439,8 +511,16 @@ class AffiliateRoutes {
                     fees: parseFloat(result.rows[0].fees),
                     netAmount: parseFloat(result.rows[0].net_amount),
                     status: result.rows[0].status,
-                    createdAt: result.rows[0].created_at
-                }
+                    createdAt: result.rows[0].created_at,
+                    riskAssessment: {
+                        score: riskScore,
+                        level: riskLevel
+                    },
+                    autoApproved
+                },
+                message: autoApproved
+                    ? 'Your withdrawal has been auto-approved and will be processed shortly'
+                    : 'Your withdrawal request is pending admin approval'
             });
         } catch (error) {
             console.error('Error requesting withdrawal:', error);

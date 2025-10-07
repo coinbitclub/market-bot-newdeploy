@@ -115,6 +115,11 @@ class SecurityConfig {
         });
     }
 
+    // Obter rate limiter específico
+    getRateLimiter(type = 'general') {
+        return this.rateLimiters.get(type) || this.rateLimiters.get('general');
+    }
+
     // Middleware de validação de IP
     ipValidationMiddleware() {
         return (req, res, next) => {

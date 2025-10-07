@@ -4,28 +4,182 @@
  *
  * IMPORTANT: Uses ONLY personal API keys - no admin/pooled trading.
  * Users must have their own Bybit/Binance API keys configured.
+ *
+ * SECURITY: Webhook authentication with signature verification and IP whitelist
  */
 
 const express = require('express');
+const crypto = require('crypto');
 
 class TradingViewWebhookRoutes {
     constructor() {
         this.router = express.Router();
         this.personalTradingEngine = null; // Will be initialized when DB is set
         this.dbPoolManager = null; // Will be set later
+
+        // Webhook security configuration
+        this.webhookSecret = process.env.TRADINGVIEW_WEBHOOK_SECRET || null;
+        this.allowedIPs = process.env.TRADINGVIEW_ALLOWED_IPS
+            ? process.env.TRADINGVIEW_ALLOWED_IPS.split(',').map(ip => ip.trim())
+            : [];
+
+        if (!this.webhookSecret) {
+            console.warn('⚠️  TRADINGVIEW_WEBHOOK_SECRET not set - webhook authentication disabled');
+            console.warn('⚠️  Generate secret: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+        }
+
         this.setupRoutes();
     }
 
     setupRoutes() {
-        // TradingView webhook endpoint (no auth required for webhooks)
-        this.router.post('/signal', this.handleTradingViewSignal.bind(this));
-        this.router.post('/webhook', this.handleTradingViewSignal.bind(this)); // Alternative endpoint
+        // TradingView webhook endpoints with authentication
+        this.router.post('/signal',
+            this.authenticateWebhook.bind(this),
+            this.handleTradingViewSignal.bind(this)
+        );
+        this.router.post('/webhook',
+            this.authenticateWebhook.bind(this),
+            this.handleTradingViewSignal.bind(this)
+        );
 
-        // Test endpoint to validate webhook format
-        this.router.post('/test', this.testWebhookFormat.bind(this));
-        
-        // Webhook status and configuration
+        // Test endpoint (requires authentication in production)
+        this.router.post('/test',
+            this.authenticateWebhook.bind(this),
+            this.testWebhookFormat.bind(this)
+        );
+
+        // Webhook status and configuration (public endpoint)
         this.router.get('/status', this.getWebhookStatus.bind(this));
+    }
+
+    /**
+     * Authenticate TradingView webhook using signature verification and IP whitelist
+     * Middleware function
+     */
+    authenticateWebhook(req, res, next) {
+        try {
+            // Skip authentication in development if secret not set
+            if (!this.webhookSecret && process.env.NODE_ENV !== 'production') {
+                console.log('⚠️  Webhook authentication skipped (development mode)');
+                return next();
+            }
+
+            // REQUIRED in production
+            if (!this.webhookSecret && process.env.NODE_ENV === 'production') {
+                console.error('❌ Webhook authentication failed: No secret configured');
+                return res.status(500).json({
+                    success: false,
+                    error: 'Webhook authentication not configured',
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            // Get client IP
+            const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
+
+            // IP Whitelist check (if configured)
+            if (this.allowedIPs.length > 0 && !this.isIPAllowed(clientIP)) {
+                console.warn(`❌ Webhook blocked - Unauthorized IP: ${clientIP}`);
+                return res.status(403).json({
+                    success: false,
+                    error: 'Unauthorized IP address',
+                    ip: clientIP,
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            // Get signature from headers
+            const receivedSignature = req.headers['x-tradingview-signature'] ||
+                                     req.headers['x-webhook-signature'];
+
+            if (!receivedSignature) {
+                console.warn('❌ Webhook blocked - No signature provided');
+                return res.status(401).json({
+                    success: false,
+                    error: 'Webhook signature required',
+                    message: 'Include X-TradingView-Signature header with HMAC-SHA256 signature',
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            // Verify signature
+            const payload = JSON.stringify(req.body);
+            const expectedSignature = this.generateWebhookSignature(payload);
+
+            if (!this.verifySignature(receivedSignature, expectedSignature)) {
+                console.warn('❌ Webhook blocked - Invalid signature');
+                return res.status(401).json({
+                    success: false,
+                    error: 'Invalid webhook signature',
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            console.log(`✅ Webhook authenticated successfully from IP: ${clientIP}`);
+            next();
+
+        } catch (error) {
+            console.error('❌ Webhook authentication error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Webhook authentication failed',
+                message: error.message,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+
+    /**
+     * Generate HMAC-SHA256 signature for webhook payload
+     */
+    generateWebhookSignature(payload) {
+        return crypto
+            .createHmac('sha256', this.webhookSecret)
+            .update(payload)
+            .digest('hex');
+    }
+
+    /**
+     * Verify webhook signature using timing-safe comparison
+     */
+    verifySignature(received, expected) {
+        // Use timing-safe comparison to prevent timing attacks
+        if (received.length !== expected.length) {
+            return false;
+        }
+
+        try {
+            return crypto.timingSafeEqual(
+                Buffer.from(received, 'hex'),
+                Buffer.from(expected, 'hex')
+            );
+        } catch (error) {
+            // If timingSafeEqual fails, fall back to direct comparison
+            return received === expected;
+        }
+    }
+
+    /**
+     * Check if IP is in whitelist
+     */
+    isIPAllowed(clientIP) {
+        // Extract IP from IPv6 format if needed
+        const cleanIP = clientIP.replace(/^::ffff:/, '');
+
+        // Check if IP is in whitelist
+        for (const allowedIP of this.allowedIPs) {
+            if (cleanIP === allowedIP || clientIP === allowedIP) {
+                return true;
+            }
+
+            // Support CIDR notation (basic implementation)
+            if (allowedIP.includes('/')) {
+                // TODO: Implement proper CIDR matching if needed
+                console.log('⚠️  CIDR notation not fully supported yet');
+            }
+        }
+
+        return false;
     }
 
     /**

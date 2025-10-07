@@ -17,10 +17,25 @@ class AuthRoutes {
     constructor() {
         this.dbPoolManager = null; // Will be set later
         this.affiliateService = null; // Will be set later
-        this.jwtSecret = process.env.JWT_SECRET || 'coinbitclub_enterprise_secret_2025';
-        this.jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'coinbitclub_refresh_secret_2025';
+
+        // CRITICAL: Enforce JWT secrets in production
+        if (process.env.NODE_ENV === 'production') {
+            if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+                throw new Error('FATAL: JWT_SECRET must be set and at least 32 characters in production');
+            }
+            if (!process.env.JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET.length < 32) {
+                throw new Error('FATAL: JWT_REFRESH_SECRET must be set and at least 32 characters in production');
+            }
+        }
+
+        this.jwtSecret = process.env.JWT_SECRET || (process.env.NODE_ENV === 'development' ? 'dev-jwt-secret-CHANGE-IN-PRODUCTION' : null);
+        this.jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || (process.env.NODE_ENV === 'development' ? 'dev-refresh-secret-CHANGE-IN-PRODUCTION' : null);
         this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '24h';
         this.jwtRefreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+
+        if (!this.jwtSecret || !this.jwtRefreshSecret) {
+            throw new Error('FATAL: JWT secrets not configured');
+        }
 
         // Create router inside the class
         this.router = express.Router();

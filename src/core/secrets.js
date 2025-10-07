@@ -32,21 +32,69 @@ class SecretsManager {
     }
 
     encrypt(text) {
+        // SECURITY FIX: Use authenticated encryption (AES-256-GCM) with proper IV
         const iv = crypto.randomBytes(16);
-        const cipher = crypto.createCipher('aes-256-cbc', this.encryptionKey);
+        const algorithm = 'aes-256-gcm';
+
+        const cipher = crypto.createCipheriv(algorithm, this.encryptionKey, iv);
         let encrypted = cipher.update(text, 'utf8', 'hex');
         encrypted += cipher.final('hex');
-        return iv.toString('hex') + ':' + encrypted;
+
+        // Get authentication tag for integrity verification
+        const authTag = cipher.getAuthTag();
+
+        // Format: IV:AuthTag:EncryptedData
+        return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
     }
 
     decrypt(encryptedText) {
-        const parts = encryptedText.split(':');
-        const iv = Buffer.from(parts[0], 'hex');
-        const encrypted = parts[1];
-        const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey);
-        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-        decrypted += decipher.final('utf8');
-        return decrypted;
+        try {
+            const parts = encryptedText.split(':');
+
+            // Handle both old format (IV:Encrypted) and new format (IV:AuthTag:Encrypted)
+            if (parts.length === 2) {
+                // Old format - attempt legacy decryption (for backward compatibility)
+                logger.warn('Decrypting data with legacy format - please re-encrypt');
+                return this.decryptLegacy(encryptedText);
+            }
+
+            const iv = Buffer.from(parts[0], 'hex');
+            const authTag = Buffer.from(parts[1], 'hex');
+            const encrypted = parts[2];
+            const algorithm = 'aes-256-gcm';
+
+            const decipher = crypto.createDecipheriv(algorithm, this.encryptionKey, iv);
+            decipher.setAuthTag(authTag);
+
+            let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+
+            return decrypted;
+        } catch (error) {
+            logger.error('Decryption failed', { error: error.message });
+            throw new Error('Failed to decrypt data - data may be corrupted or tampered');
+        }
+    }
+
+    /**
+     * Legacy decryption for backward compatibility (DEPRECATED)
+     * Should only be used during migration period
+     */
+    decryptLegacy(encryptedText) {
+        try {
+            const parts = encryptedText.split(':');
+            const encrypted = parts[1];
+
+            // Use ECB mode for legacy data (insecure but needed for migration)
+            const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey);
+            let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+
+            logger.warn('Legacy decryption used - please re-encrypt this secret');
+            return decrypted;
+        } catch (error) {
+            throw new Error('Failed to decrypt legacy data');
+        }
     }
 
     setSecret(key, value, encrypt = false) {
