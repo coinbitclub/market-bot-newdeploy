@@ -94,7 +94,8 @@ class SecurityConfig {
 
     // Configuração do CORS
     getCorsConfig() {
-        const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'https://market-bot-frontend.vercel.app/'];
+        // const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'https://market-bot-frontend.vercel.app/'];
+        const allowedOrigins = ['*'];
         
         return cors({
             origin: (origin, callback) => {
