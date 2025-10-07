@@ -94,18 +94,31 @@ class SecurityConfig {
 
     // Configuração do CORS
     getCorsConfig() {
-        // const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'https://market-bot-frontend.vercel.app/'];
-        const allowedOrigins = ['*'];
-        
+        // Read from environment or use development defaults
+        const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || [
+            'http://localhost:3000',
+            'http://localhost:3003',
+            'https://market-bot-frontend.vercel.app'
+        ];
+
+        // In development, allow all origins for easier testing
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+
         return cors({
             origin: (origin, callback) => {
                 // Permitir requests sem origin (Postman, mobile apps, etc.)
                 if (!origin) return callback(null, true);
-                
-                if (allowedOrigins.includes(origin)) {
+
+                // Em desenvolvimento, permitir todas as origens
+                if (isDevelopment) {
+                    return callback(null, true);
+                }
+
+                // Em produção, verificar lista de origens permitidas
+                if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
                     callback(null, true);
                 } else {
-                    logger.warn('CORS blocked request', { origin });
+                    logger.warn('CORS blocked request', { origin, allowedOrigins });
                     callback(new Error('Não permitido pelo CORS'));
                 }
             },
