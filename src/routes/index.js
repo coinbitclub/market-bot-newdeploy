@@ -9,6 +9,7 @@ const router = express.Router();
 // Import route modules
 const AuthRoutes = require('./auth');
 const userSettingsRoutes = require('./users');
+const UserExchangeSettingsRoutes = require('./user-settings');
 const tradingRoutes = require('./trading');
 const financialRoutes = require('./financial');
 const stripeRoutes = require('./stripe');
@@ -22,13 +23,16 @@ const PerformanceRoutes = require('./performance');
 const OperationsRoutes = require('./operations');
 const TradingViewWebhookRoutes = require('./tradingview-webhook');
 const UserAPIKeysRoutes = require('./user-api-keys');
+const EmergencyMigrationRoute = require('./run-emergency-migration');
 
 // Create auth routes instance
 const authRoutes = new AuthRoutes();
+const userExchangeSettingsRoutes = new UserExchangeSettingsRoutes();
 const performanceRoutes = new PerformanceRoutes();
 const operationsRoutes = new OperationsRoutes();
 const tradingViewWebhookRoutes = new TradingViewWebhookRoutes();
 const userAPIKeysRoutes = new UserAPIKeysRoutes();
+const emergencyMigrationRoute = new EmergencyMigrationRoute();
 
 // Function to set database pool manager for all routes
 const setDbPoolManager = (dbPoolManager) => {
@@ -40,11 +44,13 @@ const setDbPoolManager = (dbPoolManager) => {
     // publicPlansRoutes.setDbPoolManager(dbPoolManager); // Module not available
     stripeWebhooksRoutes.setDbPoolManager(dbPoolManager);
     userSettingsRoutes.setDbPoolManager(dbPoolManager);
+    userExchangeSettingsRoutes.setDbPoolManager(dbPoolManager);
     tradingViewWebhookRoutes.setDbPoolManager(dbPoolManager);
     // FIXED: Add performance and operations routes database setup
     performanceRoutes.setDbPoolManager(dbPoolManager);
     operationsRoutes.setDbPoolManager(dbPoolManager);
     userAPIKeysRoutes.setDbPoolManager(dbPoolManager);
+    emergencyMigrationRoute.setDbPoolManager(dbPoolManager);
     affiliateRoutes.setDbPoolManager(dbPoolManager);
     adminRoutes.setDbPoolManager(dbPoolManager);
 
@@ -63,6 +69,7 @@ router.get('/status', (req, res) => {
         services: {
             auth: 'active',
             user: 'active',
+            userExchangeSettings: 'active',
             trading: 'active',
             financial: 'active',
             stripe: 'active',
@@ -78,7 +85,7 @@ router.get('/status', (req, res) => {
             userAPIKeys: 'active'
         },
         tradingMode: 'PERSONAL',
-        note: 'Users must connect their own Bybit/Binance API keys to trade'
+        note: 'Users must connect their own Bybit/Binance API keys to trade. Users can now set their preferred exchange (Bybit/Binance) via /api/user/settings/exchange'
     });
 });
 
@@ -149,6 +156,7 @@ router.get('/operations-all-test', async (req, res) => {
 // Route modules
 router.use('/auth', authRoutes.getRouter());
 router.use('/user-settings', userSettingsRoutes.getRouter());
+router.use('/user/settings', userExchangeSettingsRoutes.getRouter());
 router.use('/trading', tradingRoutes.getRouter());
 router.use('/financial', financialRoutes.getRouter());
 router.use('/stripe', stripeRoutes.getRouter());
@@ -162,5 +170,6 @@ router.use('/performance', performanceRoutes.getRouter());
 router.use('/operations', operationsRoutes.getRouter());
 router.use('/tradingview', tradingViewWebhookRoutes.getRouter());
 router.use('/user-api-keys', userAPIKeysRoutes.getRouter());
+router.use('/emergency-migration', emergencyMigrationRoute.getRouter());
 
 module.exports = { router, setDbPoolManager };

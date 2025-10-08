@@ -39,20 +39,28 @@ class PersonalTradingEngine {
     async processSignalForAllUsers(signal) {
         try {
             console.log('📡 Processing signal with personal API keys:', signal);
+            console.log('🔍 DEBUG [1/7]: Starting processSignalForAllUsers');
+            console.log('🔍 DEBUG: Signal =', JSON.stringify({ symbol: signal.symbol, action: signal.action, price: signal.price }));
 
             // Broadcast signal
+            console.log('🔍 DEBUG [2/7]: Broadcasting signal received');
             tradingWebSocket.broadcastSignalReceived(signal);
 
             // 1. Get market analysis
+            console.log('🔍 DEBUG [3/7]: Calling marketAnalyzer.analyzeMarket');
             const marketAnalysis = await this.marketAnalyzer.analyzeMarket(signal.symbol || 'BTCUSDT');
+            console.log('🔍 DEBUG: Market analysis =', marketAnalysis.sentiment);
 
             // 2. Make AI decision
+            console.log('🔍 DEBUG [4/7]: Calling aiDecision.makeDecision');
             const aiDecision = await this.aiDecision.makeDecision(signal, marketAnalysis);
             console.log(`🤖 AI Decision: ${aiDecision.action} (confidence: ${aiDecision.confidence}%)`);
+            console.log('🔍 DEBUG: AI action =', aiDecision.action, 'confidence =', aiDecision.confidence);
 
             tradingWebSocket.broadcastAIDecision(aiDecision, signal);
 
             if (aiDecision.action === 'HOLD') {
+                console.log('🔍 DEBUG: AI said HOLD, returning early (NO TRADES)');
                 return {
                     success: true,
                     message: 'AI decided to HOLD - no trades executed',
@@ -63,9 +71,13 @@ class PersonalTradingEngine {
             }
 
             // 3. Get users with personal API keys configured
+            console.log('🔍 DEBUG [5/7]: AI approved trade, calling getUsersWithPersonalKeys');
+            console.log('🔍 DEBUG: Looking for users with symbol =', signal.symbol);
             const activeUsers = await this.getUsersWithPersonalKeys(signal.symbol);
+            console.log('🔍 DEBUG: getUsersWithPersonalKeys returned', activeUsers.length, 'users');
 
             if (activeUsers.length === 0) {
+                console.log('🔍 DEBUG: NO USERS FOUND - returning early');
                 return {
                     success: true,
                     message: 'No users with personal API keys found',
@@ -76,9 +88,12 @@ class PersonalTradingEngine {
             }
 
             console.log(`👥 Found ${activeUsers.length} users with personal API keys`);
+            console.log('🔍 DEBUG [6/7]: Users found:', activeUsers.map(u => `User ${u.id}`).join(', '));
 
             // 4. Execute trades by plan priority
+            console.log('🔍 DEBUG [7/7]: Calling executeTradesByPriority');
             const executionResults = await this.executeTradesByPriority(signal, aiDecision, activeUsers);
+            console.log('🔍 DEBUG: executeTradesByPriority returned', executionResults.length, 'results');
 
             // 5. Broadcast execution summary
             const finalResult = {
@@ -99,6 +114,9 @@ class PersonalTradingEngine {
 
         } catch (error) {
             console.error('❌ Error processing signal:', error);
+            console.error('🔍 DEBUG: CAUGHT ERROR in processSignalForAllUsers');
+            console.error('🔍 DEBUG: Error message:', error.message);
+            console.error('🔍 DEBUG: Error stack:', error.stack);
             return {
                 success: false,
                 error: error.message,
@@ -115,11 +133,12 @@ class PersonalTradingEngine {
      */
     async getUsersWithPersonalKeys(symbol) {
         try {
-            // Determine preferred exchange based on symbol
-            const preferredExchange = this.getPreferredExchange(symbol);
+            console.log('🔍 DEBUG [getUsersWithPersonalKeys]: ENTERED method');
+            console.log('🔍 DEBUG: Symbol parameter =', symbol);
 
             // Get users with verified personal API keys (PERSONAL mode only - no admin keys)
-            // Uses existing user_api_keys table
+            // Uses per-user preferred_exchange setting
+            console.log('🔍 DEBUG: Querying users with their preferred exchange...');
             const result = await this.dbPoolManager.executeRead(`
                 SELECT
                     u.id, u.username, u.plan_type, u.subscription_status,
@@ -127,7 +146,8 @@ class PersonalTradingEngine {
                     u.balance_admin_brl, u.balance_admin_usd,
                     u.max_open_positions, u.default_leverage, u.risk_level,
                     u.trading_mode,
-                    uak.exchange as preferred_exchange,
+                    u.preferred_exchange,
+                    uak.exchange as configured_exchange,
                     uak.api_key,
                     uak.verified,
                     uak.enabled,
@@ -142,27 +162,42 @@ class PersonalTradingEngine {
                 INNER JOIN user_api_keys uak ON u.id = uak.user_id
                 WHERE u.subscription_status = 'active'
                 AND (u.trading_mode = 'PERSONAL' OR u.trading_mode IS NULL)
-                AND uak.exchange = $1
+                AND uak.exchange = u.preferred_exchange
                 AND uak.is_active = TRUE
                 AND uak.enabled = TRUE
                 AND uak.verified = TRUE
                 AND uak.api_key IS NOT NULL
                 AND uak.api_secret IS NOT NULL
                 ORDER BY plan_priority
-            `, [preferredExchange.toLowerCase()]);
+            `);
 
-            return result.rows.map(user => ({
+            console.log('🔍 DEBUG: Query executed successfully');
+            console.log('🔍 DEBUG: Raw result.rows.length =', result.rows.length);
+            if (result.rows.length > 0) {
+                console.log('🔍 DEBUG: First user found:', { id: result.rows[0].id, email: result.rows[0].email || result.rows[0].username });
+            } else {
+                console.log('🔍 DEBUG: NO ROWS RETURNED FROM QUERY');
+            }
+
+            const mappedUsers = result.rows.map(user => ({
                 ...user,
                 operationalBalance: {
                     brl: parseFloat(user.balance_real_brl || 0) + parseFloat(user.balance_admin_brl || 0),
                     usd: parseFloat(user.balance_real_usd || 0) + parseFloat(user.balance_admin_usd || 0)
                 },
                 planConfig: this.PLAN_PRIORITIES[user.plan_type] || this.PLAN_PRIORITIES['TRIAL'],
-                preferredExchange: user.preferred_exchange || preferredExchange
+                preferredExchange: user.preferred_exchange || user.configured_exchange || 'bybit'
             }));
+
+            console.log('🔍 DEBUG: Mapped users count =', mappedUsers.length);
+            console.log('🔍 DEBUG: Returning from getUsersWithPersonalKeys with', mappedUsers.length, 'users');
+            return mappedUsers;
 
         } catch (error) {
             console.error('❌ Error getting users with personal keys:', error);
+            console.error('🔍 DEBUG: ERROR CAUGHT - Stack:', error.stack);
+            console.error('🔍 DEBUG: ERROR CAUGHT - Message:', error.message);
+            console.error('🔍 DEBUG: Returning empty array due to error');
             return [];
         }
     }
@@ -488,7 +523,22 @@ class PersonalTradingEngine {
      */
     calculatePositionSize(user, signal) {
         const availableBalance = Math.max(user.operationalBalance.brl / 5.5, user.operationalBalance.usd);
-        const riskPercent = (user.risk_level || 2) / 100;
+
+        // Convert risk_level (can be string 'low'/'medium'/'high' or number)
+        let riskLevel = 2; // default medium
+        if (typeof user.risk_level === 'string') {
+            const riskMap = {
+                'low': 1,
+                'medium': 2,
+                'high': 5,
+                'very_high': 10
+            };
+            riskLevel = riskMap[user.risk_level.toLowerCase()] || 2;
+        } else if (typeof user.risk_level === 'number') {
+            riskLevel = user.risk_level;
+        }
+
+        const riskPercent = riskLevel / 100;
         const maxPositionSize = availableBalance * riskPercent;
         const minPositionSize = 10;
 
