@@ -213,6 +213,15 @@ class UserAPIKeysRoutes {
                 });
             }
 
+            // Check if API key manager is initialized
+            if (!this.apiKeyManager) {
+                console.error('❌ API Key Manager not initialized');
+                return res.status(500).json({
+                    success: false,
+                    error: 'Service not initialized'
+                });
+            }
+
             const [bybitStatus, binanceStatus] = await Promise.all([
                 this.apiKeyManager.getAPIKeyStatus(userId, 'bybit'),
                 this.apiKeyManager.getAPIKeyStatus(userId, 'binance')
@@ -236,9 +245,11 @@ class UserAPIKeysRoutes {
 
         } catch (error) {
             console.error('❌ Error getting all API keys status:', error);
+            console.error('❌ Error stack:', error.stack);
             res.status(500).json({
                 success: false,
-                error: 'Failed to get API keys status'
+                error: 'Failed to get API keys status',
+                details: error.message
             });
         }
     }
