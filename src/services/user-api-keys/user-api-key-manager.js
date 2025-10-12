@@ -143,18 +143,20 @@ class UserAPIKeyManager {
                 return credentials;
             }
 
-            // Create temporary exchange service instance
+            // Create temporary exchange service instance with user credentials
             let exchangeService;
             if (exchange.toLowerCase() === 'bybit') {
                 const BybitService = require('../exchange/bybit-service');
-                exchangeService = new BybitService();
-                exchangeService.apiKey = credentials.apiKey;
-                exchangeService.apiSecret = credentials.apiSecret;
+                exchangeService = new BybitService({
+                    apiKey: credentials.apiKey,
+                    apiSecret: credentials.apiSecret
+                });
             } else if (exchange.toLowerCase() === 'binance') {
                 const BinanceService = require('../exchange/binance-service');
-                exchangeService = new BinanceService();
-                exchangeService.apiKey = credentials.apiKey;
-                exchangeService.apiSecret = credentials.apiSecret;
+                exchangeService = new BinanceService({
+                    apiKey: credentials.apiKey,
+                    apiSecret: credentials.apiSecret
+                });
             } else {
                 return {
                     success: false,
@@ -215,12 +217,14 @@ class UserAPIKeyManager {
      */
     async checkAPIKeyPermissions(exchangeService, exchange) {
         try {
-            const accountInfo = exchange.toLowerCase() === 'bybit'
-                ? await exchangeService.getAccountBalance()
-                : await exchangeService.getAccountInfo();
+            // Both Bybit and Binance use getAccountInfo()
+            const accountInfo = await exchangeService.getAccountInfo();
+
+            // Check if we got valid account data
+            const hasValidData = accountInfo && (accountInfo.data || accountInfo.balances);
 
             return {
-                can_read: !!accountInfo,
+                can_read: !!hasValidData,
                 can_trade: false, // Would need to test actual trade
                 can_withdraw: false
             };

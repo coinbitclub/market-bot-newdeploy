@@ -7,34 +7,68 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 class BybitService {
-    constructor() {
+    /**
+     * @param {Object} credentials - Optional user credentials
+     * @param {string} credentials.apiKey - User's API key
+     * @param {string} credentials.apiSecret - User's API secret
+     * @param {boolean} credentials.isTestnet - Whether to use testnet (optional)
+     */
+    constructor(credentials = null) {
         this.baseURL = 'https://api.bybit.com';
         this.testnetURL = 'https://api-testnet.bybit.com';
-        this.isTestnet = process.env.BYBIT_TESTNET === 'true';
 
-        // Use test credentials when in testnet mode
-        if (this.isTestnet) {
-            this.apiKey = process.env.BYBIT_TEST_API_KEY || process.env.BYBIT_API_KEY;
-            this.apiSecret = process.env.BYBIT_TEST_API_SECRET || process.env.BYBIT_API_SECRET;
+        // Determine if using testnet
+        if (credentials && credentials.isTestnet !== undefined) {
+            this.isTestnet = credentials.isTestnet;
+        } else {
+            this.isTestnet = process.env.BYBIT_TESTNET === 'true';
+        }
+
+        // Use provided credentials or fallback to environment variables
+        if (credentials && credentials.apiKey && credentials.apiSecret) {
+            // Use user-provided credentials
+            this.apiKey = credentials.apiKey;
+            this.apiSecret = credentials.apiSecret;
+            this.isUserCredentials = true;
         } else {
             this.apiKey = process.env.BYBIT_API_KEY;
             this.apiSecret = process.env.BYBIT_API_SECRET;
+            this.isUserCredentials = false;
         }
-        
+
         this.currentURL = this.isTestnet ? this.testnetURL : this.baseURL;
-        
-        console.log(`🔥 Bybit Service initialized - ${this.isTestnet ? 'TESTNET' : 'MAINNET'}`);
+
+        console.log(`🔥 Bybit Service initialized - ${this.isTestnet ? 'TESTNET' : 'MAINNET'} - ${this.isUserCredentials ? 'USER CREDENTIALS' : 'ENV CREDENTIALS'}`);
         if (this.isTestnet && this.apiKey) {
-            console.log(`🔑 Using Bybit testnet API key: ${this.apiKey.substring(0, 8)}...`);
+            console.log(`🔑 Using Bybit API key: ${this.apiKey.substring(0, 8)}...`);
         }
     }
 
     /**
-     * Generate signature for authenticated requests
+     * Generate signature for authenticated requests (Bybit V5 API)
+     * @param {string} timestamp - Timestamp in milliseconds
+     * @param {string} recvWindow - Receive window in milliseconds
+     * @param {string} method - HTTP method (GET or POST)
+     * @param {Object} params - Request parameters
+     * @returns {string} HMAC SHA256 signature
      */
-    generateSignature(timestamp, recvWindow, params) {
-        const queryString = new URLSearchParams(params).toString();
-        const signString = timestamp + this.apiKey + recvWindow + queryString;
+    generateSignature(timestamp, recvWindow, method, params) {
+        let paramStr = '';
+
+        if (method === 'GET') {
+            // For GET requests: use query string (without '?')
+            if (Object.keys(params).length > 0) {
+                paramStr = new URLSearchParams(params).toString();
+            }
+        } else {
+            // For POST/PUT/DELETE requests: use raw JSON body
+            if (Object.keys(params).length > 0) {
+                paramStr = JSON.stringify(params);
+            }
+        }
+
+        // Bybit V5 signature: timestamp + apiKey + recvWindow + paramStr
+        const signString = timestamp + this.apiKey + recvWindow + paramStr;
         return crypto.createHmac('sha256', this.apiSecret).update(signString).digest('hex');
     }
 
@@ -48,8 +82,24 @@ class BybitService {
                 url: `${this.currentURL}/v5/market/time`,
                 timeout: 5000
             });
-            // Return server time in milliseconds
-            return parseInt(response.data.result.timeSecond) * 1000;
+
+            // Bybit V5 returns time in different formats
+            if (response.data && response.data.result) {
+                // Check for timeSecond (in seconds) or timeNano (in nanoseconds)
+                if (response.data.result.timeSecond) {
+                    return parseInt(response.data.result.timeSecond) * 1000;
+                } else if (response.data.result.timeNano) {
+                    return Math.floor(parseInt(response.data.result.timeNano) / 1000000);
+                }
+            }
+
+            // If direct time property exists
+            if (response.data && response.data.time) {
+                return parseInt(response.data.time);
+            }
+
+            console.warn('⚠️ Unexpected server time format, using local time');
+            return Date.now();
         } catch (error) {
             console.warn('⚠️ Could not get server time, using local time');
             return Date.now();
@@ -67,9 +117,11 @@ class BybitService {
 
             // Use server time for better synchronization
             const serverTime = await this.getServerTime();
-            const timestamp = Math.floor(serverTime / 1000).toString(); // Convert to seconds
-            const recvWindow = '10000'; // Increased window for better reliability
-            const signature = this.generateSignature(timestamp, recvWindow, params);
+            const timestamp = serverTime.toString(); // Milliseconds as required by Bybit V5 API
+            const recvWindow = '10000'; // 10 second window for clock skew tolerance
+
+            // Generate signature with correct method-specific format
+            const signature = this.generateSignature(timestamp, recvWindow, method, params);
 
             const config = {
                 method,
@@ -383,7 +435,7 @@ class BybitService {
             if (reduceOnly) params.reduceOnly = reduceOnly.toString();
 
             const data = await this.makeAuthenticatedRequest('/v5/order/create', params, 'POST');
-            
+
             if (data.result) {
                 return {
                     orderId: data.result.orderId,
@@ -515,9 +567,9 @@ class BybitService {
     }
 
     /**
-     * Get server time
+     * Get server time details (public method for external use)
      */
-    async getServerTime() {
+    async getServerTimeDetails() {
         try {
             const data = await this.makePublicRequest('/v5/market/time');
             return {
@@ -628,7 +680,7 @@ class BybitService {
      */
     async getOrderHistory(category = 'spot', symbol = null, limit = 50) {
         try {
-            const params = { 
+            const params = {
                 category,
                 limit: limit.toString()
             };

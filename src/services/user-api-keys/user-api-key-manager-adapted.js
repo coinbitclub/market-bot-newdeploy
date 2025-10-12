@@ -132,18 +132,20 @@ class UserAPIKeyManager {
                 return credentials;
             }
 
-            // Create temporary exchange service instance
+            // Create temporary exchange service instance with user credentials
             let exchangeService;
             if (exchange.toLowerCase() === 'bybit') {
                 const BybitService = require('../exchange/bybit-service');
-                exchangeService = new BybitService();
-                exchangeService.apiKey = credentials.apiKey;
-                exchangeService.apiSecret = credentials.apiSecret;
+                exchangeService = new BybitService({
+                    apiKey: credentials.apiKey,
+                    apiSecret: credentials.apiSecret
+                });
             } else if (exchange.toLowerCase() === 'binance') {
                 const BinanceService = require('../exchange/binance-service');
-                exchangeService = new BinanceService();
-                exchangeService.apiKey = credentials.apiKey;
-                exchangeService.apiSecret = credentials.apiSecret;
+                exchangeService = new BinanceService({
+                    apiKey: credentials.apiKey,
+                    apiSecret: credentials.apiSecret
+                });
             } else {
                 return {
                     success: false,
@@ -154,7 +156,8 @@ class UserAPIKeyManager {
             // Test the API key by fetching account info
             let testResult;
             if (exchange.toLowerCase() === 'bybit') {
-                testResult = await exchangeService.getAccountBalance();
+                // Use getAccountInfo for Bybit (returns account details)
+                testResult = await exchangeService.getAccountInfo();
             } else {
                 testResult = await exchangeService.getAccountInfo();
             }

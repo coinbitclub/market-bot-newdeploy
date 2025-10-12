@@ -27,6 +27,9 @@ class UserSettingsRoutes {
         // Get user's mainnet balance (real-time from exchange)
         this.router.get('/balance', this.getMainnetBalance.bind(this));
 
+        // Get all exchange balances in one call
+        this.router.get('/all-balances', this.getAllExchangeBalances.bind(this));
+
         // Get user's trading settings
         this.router.get('/trading', this.getTradingSettings.bind(this));
 
@@ -294,17 +297,19 @@ class UserSettingsRoutes {
             try {
                 if (exchange === 'bybit') {
                     const BybitService = require('../services/exchange/bybit-service');
-                    const service = new BybitService();
-                    service.apiKey = user.api_key;
-                    service.apiSecret = user.api_secret;
+                    const service = new BybitService({
+                        apiKey: user.api_key,
+                        apiSecret: user.api_secret
+                    });
 
                     const balance = await service.getWalletBalance('UNIFIED');
                     balanceData = this.parseBybitBalance(balance);
                 } else if (exchange === 'binance') {
                     const BinanceService = require('../services/exchange/binance-service');
-                    const service = new BinanceService();
-                    service.apiKey = user.api_key;
-                    service.apiSecret = user.api_secret;
+                    const service = new BinanceService({
+                        apiKey: user.api_key,
+                        apiSecret: user.api_secret
+                    });
 
                     const balance = await service.getAccountInfo();
                     balanceData = this.parseBinanceBalance(balance);
@@ -575,6 +580,134 @@ class UserSettingsRoutes {
             res.status(500).json({
                 success: false,
                 error: 'Failed to update trading settings',
+                message: error.message
+            });
+        }
+    }
+
+    /**
+     * GET /api/user/settings/all-balances
+     * Get all exchange balances (Binance + Bybit) in one call
+     */
+    async getAllExchangeBalances(req, res) {
+        try {
+            const userId = req.user?.id || req.userId;
+
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Unauthorized'
+                });
+            }
+
+            console.log(`📊 Fetching all exchange balances for user ${userId}...`);
+
+            // Get all active and verified API keys for the user
+            const apiKeysResult = await this.dbPoolManager.executeRead(`
+                SELECT
+                    uak.exchange,
+                    uak.api_key,
+                    uak.api_secret,
+                    uak.environment
+                FROM user_api_keys uak
+                WHERE uak.user_id = $1
+                AND uak.is_active = TRUE
+                AND uak.enabled = TRUE
+                AND uak.verified = TRUE
+                ORDER BY uak.exchange
+            `, [userId]);
+
+            if (apiKeysResult.rows.length === 0) {
+                return res.json({
+                    success: true,
+                    data: {
+                        binance: null,
+                        bybit: null,
+                        total_usd: 0,
+                        has_keys: false,
+                        message: 'No verified API keys found'
+                    },
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            const balances = {
+                binance: null,
+                bybit: null,
+                total_usd: 0,
+                has_keys: true
+            };
+
+            // Fetch balances from each exchange in parallel
+            const balancePromises = apiKeysResult.rows.map(async (keyData) => {
+                const exchange = keyData.exchange.toLowerCase();
+                
+                try {
+                    if (exchange === 'binance') {
+                        const BinanceService = require('../services/exchange/binance-service');
+                        const service = new BinanceService({
+                            apiKey: keyData.api_key,
+                            apiSecret: keyData.api_secret,
+                            isTestnet: keyData.environment === 'testnet'
+                        });
+
+                        const balance = await service.getAccountInfo();
+                        const parsedBalance = this.parseBinanceBalance({ success: true, result: balance });
+                        balances.binance = {
+                            ...parsedBalance,
+                            environment: keyData.environment
+                        };
+                        return parsedBalance.total_equity;
+                    } else if (exchange === 'bybit') {
+                        const BybitService = require('../services/exchange/bybit-service');
+                        const service = new BybitService({
+                            apiKey: keyData.api_key,
+                            apiSecret: keyData.api_secret,
+                            isTestnet: keyData.environment === 'testnet'
+                        });
+
+                        const balance = await service.getWalletBalance('UNIFIED');
+                        const parsedBalance = this.parseBybitBalance(balance);
+                        balances.bybit = {
+                            ...parsedBalance,
+                            environment: keyData.environment
+                        };
+                        return parsedBalance.total_equity;
+                    }
+                    return 0;
+                } catch (error) {
+                    console.error(`❌ Error fetching ${exchange} balance:`, error.message);
+                    // Set error state but don't fail the whole request
+                    if (exchange === 'binance') {
+                        balances.binance = { error: error.message, total_equity: 0 };
+                    } else if (exchange === 'bybit') {
+                        balances.bybit = { error: error.message, total_equity: 0 };
+                    }
+                    return 0;
+                }
+            });
+
+            // Wait for all balance fetches to complete
+            const equities = await Promise.all(balancePromises);
+            balances.total_usd = equities.reduce((sum, equity) => sum + equity, 0);
+
+            console.log(`✅ Fetched balances for user ${userId}:`, {
+                binance: balances.binance?.total_equity || 0,
+                bybit: balances.bybit?.total_equity || 0,
+                total: balances.total_usd
+            });
+
+            res.json({
+                success: true,
+                data: balances,
+                timestamp: new Date().toISOString()
+            });
+
+        } catch (error) {
+            console.error('❌ Error getting all exchange balances:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to get exchange balances',
                 message: error.message
             });
         }

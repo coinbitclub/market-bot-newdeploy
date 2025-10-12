@@ -7,12 +7,19 @@ const BybitService = require('./bybit-service');
 const BinanceService = require('./binance-service');
 
 class UnifiedExchangeService {
-    constructor() {
-        this.bybitService = new BybitService();
-        this.binanceService = new BinanceService();
+    /**
+     * @param {Object} credentials - Optional user credentials
+     * @param {Object} credentials.bybit - Bybit credentials {apiKey, apiSecret, isTestnet}
+     * @param {Object} credentials.binance - Binance credentials {apiKey, apiSecret, isTestnet}
+     */
+    constructor(credentials = null) {
+        // Initialize services with user credentials if provided
+        this.bybitService = new BybitService(credentials?.bybit || null);
+        this.binanceService = new BinanceService(credentials?.binance || null);
         this.primaryExchange = 'bybit'; // Default to Bybit
         
-        console.log('🔄 Unified Exchange Service initialized');
+        const credType = credentials ? 'USER CREDENTIALS' : 'ENV CREDENTIALS';
+        console.log(`🔄 Unified Exchange Service initialized - ${credType}`);
     }
 
     /**

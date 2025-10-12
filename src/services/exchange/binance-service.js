@@ -7,19 +7,42 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 class BinanceService {
-    constructor() {
+    /**
+     * @param {Object} credentials - Optional user credentials
+     * @param {string} credentials.apiKey - User's API key
+     * @param {string} credentials.apiSecret - User's API secret
+     * @param {boolean} credentials.isTestnet - Whether to use testnet (optional)
+     */
+    constructor(credentials = null) {
         this.baseURL = 'https://api.binance.com';
         this.testnetURL = 'https://testnet.binance.vision';
-        this.isTestnet = process.env.BINANCE_TESTNET === 'true';
-        this.apiKey = process.env.BINANCE_API_KEY;
-        this.apiSecret = process.env.BINANCE_API_SECRET;
+        
+        // Determine if using testnet
+        if (credentials && credentials.isTestnet !== undefined) {
+            this.isTestnet = credentials.isTestnet;
+        } else {
+            this.isTestnet = process.env.BINANCE_TESTNET === 'true';
+        }
+
+        // Use provided credentials or fallback to environment variables
+        if (credentials && credentials.apiKey && credentials.apiSecret) {
+            // Use user-provided credentials
+            this.apiKey = credentials.apiKey;
+            this.apiSecret = credentials.apiSecret;
+            this.isUserCredentials = true;
+        } else {
+            // Fallback to environment variables (for system-level operations)
+            this.apiKey = process.env.BINANCE_API_KEY;
+            this.apiSecret = process.env.BINANCE_API_SECRET;
+            this.isUserCredentials = false;
+        }
         
         // For public endpoints, always use mainnet URL
         this.publicURL = this.baseURL;
         // For authenticated endpoints, use testnet if configured
         this.authenticatedURL = this.isTestnet ? this.testnetURL : this.baseURL;
         
-        console.log(`🔥 Binance Service initialized - ${this.isTestnet ? 'TESTNET' : 'MAINNET'}`);
+        console.log(`🔥 Binance Service initialized - ${this.isTestnet ? 'TESTNET' : 'MAINNET'} - ${this.isUserCredentials ? 'USER CREDENTIALS' : 'ENV CREDENTIALS'}`);
     }
 
     /**

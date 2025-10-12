@@ -504,17 +504,20 @@ class PersonalTradingEngine {
     async createUserExchangeService(exchange, credentials) {
         if (exchange.toLowerCase() === 'bybit') {
             const BybitService = require('../../services/exchange/bybit-service');
-            const service = new BybitService();
-            // Override with user's credentials
-            service.apiKey = credentials.apiKey;
-            service.apiSecret = credentials.apiSecret;
-            return service;
+            // Pass credentials directly to constructor
+            return new BybitService({
+                apiKey: credentials.apiKey,
+                apiSecret: credentials.apiSecret,
+                isTestnet: credentials.isTestnet || false
+            });
         } else {
             const BinanceService = require('../../services/exchange/binance-service');
-            const service = new BinanceService();
-            service.apiKey = credentials.apiKey;
-            service.apiSecret = credentials.apiSecret;
-            return service;
+            // Pass credentials directly to constructor
+            return new BinanceService({
+                apiKey: credentials.apiKey,
+                apiSecret: credentials.apiSecret,
+                isTestnet: credentials.isTestnet || false
+            });
         }
     }
 
