@@ -19,6 +19,7 @@ class UserSettingsRoutes {
      * Set database pool manager
      */
     setDbPoolManager(dbPoolManager) {
+        this.dbPoolManager = dbPoolManager;
         this.authMiddleware.setDbPoolManager(dbPoolManager);
         // Initialize encrypted API key manager
         this.apiKeyManager = new UserAPIKeyManager(dbPoolManager);
@@ -27,6 +28,13 @@ class UserSettingsRoutes {
     setupRoutes() {
         // All routes require authentication
         this.router.use(this.authMiddleware.authenticate.bind(this.authMiddleware));
+
+        // Exchange-specific settings routes (migrated from user-settings.js)
+        this.router.get('/exchange', this.getPreferredExchange.bind(this));
+        this.router.put('/exchange', this.updatePreferredExchange.bind(this));
+        this.router.get('/exchanges', this.getConfiguredExchanges.bind(this));
+        this.router.get('/balance', this.getMainnetBalance.bind(this));
+        this.router.get('/all-balances', this.getAllExchangeBalances.bind(this));
 
         // Individual settings routes
         this.router.get('/trading', this.getTradingSettings.bind(this));
@@ -1333,6 +1341,453 @@ class UserSettingsRoutes {
         }
 
         return { valid: true };
+    }
+
+    /**
+     * GET /exchange - Get user's preferred exchange
+     */
+    async getPreferredExchange(req, res) {
+        try {
+            const userId = req.user?.id || req.userId;
+
+            const result = await this.dbPoolManager.executeRead(`
+                SELECT id, email, username, preferred_exchange, trading_mode
+                FROM users
+                WHERE id = $1
+            `, [userId]);
+
+            if (result.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'User not found'
+                });
+            }
+
+            const user = result.rows[0];
+
+            res.json({
+                success: true,
+                data: {
+                    user_id: user.id,
+                    preferred_exchange: user.preferred_exchange || 'bybit',
+                    trading_mode: user.trading_mode
+                }
+            });
+
+        } catch (error) {
+            console.error('❌ Error getting preferred exchange:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to get preferred exchange',
+                message: error.message
+            });
+        }
+    }
+
+    /**
+     * PUT /exchange - Update user's preferred exchange
+     */
+    async updatePreferredExchange(req, res) {
+        try {
+            const userId = req.user?.id || req.userId;
+            const { preferred_exchange } = req.body;
+
+            // Validate exchange
+            const validExchanges = ['bybit', 'binance'];
+            if (!preferred_exchange || !validExchanges.includes(preferred_exchange.toLowerCase())) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid exchange',
+                    message: 'Exchange must be one of: bybit, binance'
+                });
+            }
+
+            const exchangeLower = preferred_exchange.toLowerCase();
+
+            // Check if user has API keys for this exchange
+            const apiKeyCheck = await this.dbPoolManager.executeRead(`
+                SELECT id, exchange, is_active, enabled, verified
+                FROM user_api_keys
+                WHERE user_id = $1
+                AND exchange = $2
+                AND is_active = TRUE
+            `, [userId, exchangeLower]);
+
+            if (apiKeyCheck.rows.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'No API keys configured',
+                    message: `Please add ${exchangeLower} API keys before setting it as preferred exchange`
+                });
+            }
+
+            const apiKey = apiKeyCheck.rows[0];
+            if (!apiKey.enabled || !apiKey.verified) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'API keys not ready',
+                    message: `${exchangeLower} API keys must be enabled and verified`
+                });
+            }
+
+            // Update preferred exchange
+            const updateResult = await this.dbPoolManager.executeWrite(`
+                UPDATE users
+                SET preferred_exchange = $1, updated_at = NOW()
+                WHERE id = $2
+                RETURNING id, email, preferred_exchange
+            `, [exchangeLower, userId]);
+
+            const user = updateResult.rows[0];
+            console.log(`✅ User ${userId} switched preferred exchange to: ${exchangeLower}`);
+
+            res.json({
+                success: true,
+                message: `Preferred exchange updated to ${exchangeLower}`,
+                data: {
+                    user_id: user.id,
+                    preferred_exchange: user.preferred_exchange
+                }
+            });
+
+        } catch (error) {
+            console.error('❌ Error updating preferred exchange:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update preferred exchange',
+                message: error.message
+            });
+        }
+    }
+
+    /**
+     * GET /exchanges - Get all configured exchanges for user
+     */
+    async getConfiguredExchanges(req, res) {
+        try {
+            const userId = req.user?.id || req.userId;
+
+            const result = await this.dbPoolManager.executeRead(`
+                SELECT
+                    uak.id,
+                    uak.exchange,
+                    uak.api_key,
+                    uak.is_active,
+                    uak.enabled,
+                    uak.verified,
+                    uak.created_at,
+                    u.preferred_exchange
+                FROM user_api_keys uak
+                INNER JOIN users u ON u.id = uak.user_id
+                WHERE uak.user_id = $1
+                ORDER BY uak.exchange, uak.created_at DESC
+            `, [userId]);
+
+            const preferredExchange = result.rows[0]?.preferred_exchange || 'bybit';
+
+            const exchanges = result.rows.map(row => ({
+                id: row.id,
+                exchange: row.exchange,
+                api_key_preview: row.api_key ? row.api_key.substring(0, 10) + '...' : null,
+                is_active: row.is_active,
+                enabled: row.enabled,
+                verified: row.verified,
+                is_preferred: row.exchange === preferredExchange,
+                configured_at: row.created_at
+            }));
+
+            res.json({
+                success: true,
+                data: {
+                    preferred_exchange: preferredExchange,
+                    exchanges: exchanges,
+                    total: exchanges.length
+                }
+            });
+
+        } catch (error) {
+            console.error('❌ Error getting configured exchanges:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to get configured exchanges',
+                message: error.message
+            });
+        }
+    }
+
+    /**
+     * GET /balance - Get user's mainnet balance (real-time from exchange)
+     */
+    async getMainnetBalance(req, res) {
+        try {
+            const userId = req.user?.id || req.userId;
+
+            // Get user's preferred exchange and API keys
+            const userResult = await this.dbPoolManager.executeRead(`
+                SELECT
+                    u.id,
+                    u.preferred_exchange,
+                    uak.exchange,
+                    uak.api_key,
+                    uak.api_secret
+                FROM users u
+                INNER JOIN user_api_keys uak ON u.id = uak.user_id
+                WHERE u.id = $1
+                AND uak.exchange = u.preferred_exchange
+                AND uak.is_active = TRUE
+                AND uak.enabled = TRUE
+                AND uak.verified = TRUE
+            `, [userId]);
+
+            if (userResult.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'No active API keys found',
+                    message: 'Please configure API keys for your preferred exchange'
+                });
+            }
+
+            const user = userResult.rows[0];
+            const exchange = user.preferred_exchange;
+
+            // Fetch balance from exchange
+            let balanceData;
+            try {
+                if (exchange === 'bybit') {
+                    const BybitService = require('../services/exchange/bybit-service');
+                    const service = new BybitService({
+                        apiKey: user.api_key,
+                        apiSecret: user.api_secret
+                    });
+                    const balance = await service.getWalletBalance('UNIFIED');
+                    balanceData = this.parseBybitBalance(balance);
+                } else if (exchange === 'binance') {
+                    const BinanceService = require('../services/exchange/binance-service');
+                    const service = new BinanceService({
+                        apiKey: user.api_key,
+                        apiSecret: user.api_secret
+                    });
+                    const balance = await service.getAccountInfo();
+                    balanceData = this.parseBinanceBalance(balance);
+                } else {
+                    throw new Error(`Unsupported exchange: ${exchange}`);
+                }
+            } catch (exchangeError) {
+                console.error(`❌ Error fetching balance from ${exchange}:`, exchangeError);
+                return res.status(503).json({
+                    success: false,
+                    error: 'Exchange API error',
+                    message: `Failed to fetch balance from ${exchange}: ${exchangeError.message}`
+                });
+            }
+
+            res.json({
+                success: true,
+                data: {
+                    exchange: exchange,
+                    ...balanceData,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
+        } catch (error) {
+            console.error('❌ Error getting mainnet balance:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to get mainnet balance',
+                message: error.message
+            });
+        }
+    }
+
+    /**
+     * GET /all-balances - Get all exchange balances (Binance + Bybit)
+     */
+    async getAllExchangeBalances(req, res) {
+        try {
+            const userId = req.user?.id || req.userId;
+
+            console.log(`📊 Fetching all exchange balances for user ${userId}...`);
+
+            // Get all active and verified API keys
+            const apiKeysResult = await this.dbPoolManager.executeRead(`
+                SELECT
+                    uak.exchange,
+                    uak.api_key,
+                    uak.api_secret,
+                    uak.environment
+                FROM user_api_keys uak
+                WHERE uak.user_id = $1
+                AND uak.is_active = TRUE
+                AND uak.enabled = TRUE
+                AND uak.verified = TRUE
+                ORDER BY uak.exchange
+            `, [userId]);
+
+            if (apiKeysResult.rows.length === 0) {
+                return res.json({
+                    success: true,
+                    data: {
+                        binance: null,
+                        bybit: null,
+                        total_usd: 0,
+                        has_keys: false,
+                        message: 'No verified API keys found'
+                    },
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            const balances = {
+                binance: null,
+                bybit: null,
+                total_usd: 0,
+                has_keys: true
+            };
+
+            // Fetch balances from each exchange in parallel
+            const balancePromises = apiKeysResult.rows.map(async (keyData) => {
+                const exchange = keyData.exchange.toLowerCase();
+                
+                try {
+                    if (exchange === 'binance') {
+                        const BinanceService = require('../services/exchange/binance-service');
+                        const service = new BinanceService({
+                            apiKey: keyData.api_key,
+                            apiSecret: keyData.api_secret,
+                            isTestnet: keyData.environment === 'testnet'
+                        });
+
+                        const balance = await service.getAccountInfo();
+                        const parsedBalance = this.parseBinanceBalance({ success: true, result: balance });
+                        balances.binance = {
+                            ...parsedBalance,
+                            environment: keyData.environment
+                        };
+                        return parsedBalance.total_equity;
+                    } else if (exchange === 'bybit') {
+                        const BybitService = require('../services/exchange/bybit-service');
+                        const service = new BybitService({
+                            apiKey: keyData.api_key,
+                            apiSecret: keyData.api_secret,
+                            isTestnet: keyData.environment === 'testnet'
+                        });
+
+                        const balance = await service.getWalletBalance('UNIFIED');
+                        const parsedBalance = this.parseBybitBalance(balance);
+                        balances.bybit = {
+                            ...parsedBalance,
+                            environment: keyData.environment
+                        };
+                        return parsedBalance.total_equity;
+                    }
+                    return 0;
+                } catch (error) {
+                    console.error(`❌ Error fetching ${exchange} balance:`, error.message);
+                    if (exchange === 'binance') {
+                        balances.binance = { error: error.message, total_equity: 0 };
+                    } else if (exchange === 'bybit') {
+                        balances.bybit = { error: error.message, total_equity: 0 };
+                    }
+                    return 0;
+                }
+            });
+
+            // Wait for all balance fetches to complete
+            const equities = await Promise.all(balancePromises);
+            balances.total_usd = equities.reduce((sum, equity) => sum + equity, 0);
+
+            console.log(`✅ Fetched balances for user ${userId}:`, {
+                binance: balances.binance?.total_equity || 0,
+                bybit: balances.bybit?.total_equity || 0,
+                total: balances.total_usd
+            });
+
+            res.json({
+                success: true,
+                data: balances,
+                timestamp: new Date().toISOString()
+            });
+
+        } catch (error) {
+            console.error('❌ Error getting all exchange balances:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to get exchange balances',
+                message: error.message
+            });
+        }
+    }
+
+    /**
+     * Helper: Parse Bybit balance response
+     */
+    parseBybitBalance(balance) {
+        if (!balance || !balance.success) {
+            return {
+                total_equity: 0,
+                available_balance: 0,
+                in_orders: 0,
+                coins: []
+            };
+        }
+
+        const walletData = balance.result?.list?.[0] || {};
+
+        return {
+            total_equity: parseFloat(walletData.totalEquity || 0),
+            available_balance: parseFloat(walletData.totalAvailableBalance || 0),
+            wallet_balance: parseFloat(walletData.totalWalletBalance || 0),
+            margin_balance: parseFloat(walletData.totalMarginBalance || 0),
+            in_orders: parseFloat(walletData.totalWalletBalance || 0) - parseFloat(walletData.totalAvailableBalance || 0),
+            coins: (walletData.coin || [])
+                .filter(c => parseFloat(c.walletBalance || 0) > 0)
+                .map(c => ({
+                    coin: c.coin,
+                    wallet_balance: parseFloat(c.walletBalance),
+                    available: parseFloat(c.availableToWithdraw),
+                    equity: parseFloat(c.equity)
+                }))
+        };
+    }
+
+    /**
+     * Helper: Parse Binance balance response
+     */
+    parseBinanceBalance(balance) {
+        if (!balance || !balance.success) {
+            return {
+                total_equity: 0,
+                available_balance: 0,
+                in_orders: 0,
+                coins: []
+            };
+        }
+
+        const accountData = balance.result || {};
+        const balances = accountData.balances || [];
+
+        const totalEquity = balances.reduce((sum, b) => {
+            return sum + parseFloat(b.free || 0) + parseFloat(b.locked || 0);
+        }, 0);
+
+        const availableBalance = balances.reduce((sum, b) => {
+            return sum + parseFloat(b.free || 0);
+        }, 0);
+
+        return {
+            total_equity: totalEquity,
+            available_balance: availableBalance,
+            in_orders: totalEquity - availableBalance,
+            coins: balances
+                .filter(b => parseFloat(b.free || 0) > 0 || parseFloat(b.locked || 0) > 0)
+                .map(b => ({
+                    coin: b.asset,
+                    wallet_balance: parseFloat(b.free || 0) + parseFloat(b.locked || 0),
+                    available: parseFloat(b.free || 0),
+                    locked: parseFloat(b.locked || 0)
+                }))
+        };
     }
 
     getRouter() {

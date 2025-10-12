@@ -9,7 +9,7 @@ const router = express.Router();
 // Import route modules
 const AuthRoutes = require('./auth');
 const userSettingsRoutes = require('./users');
-const UserExchangeSettingsRoutes = require('./user-settings');
+// const UserExchangeSettingsRoutes = require('./user-settings'); // DEPRECATED: Merged into users.js
 const tradingRoutes = require('./trading');
 const financialRoutes = require('./financial');
 const stripeRoutes = require('./stripe');
@@ -27,7 +27,7 @@ const EmergencyMigrationRoute = require('./run-emergency-migration');
 
 // Create auth routes instance
 const authRoutes = new AuthRoutes();
-const userExchangeSettingsRoutes = new UserExchangeSettingsRoutes();
+// const userExchangeSettingsRoutes = new UserExchangeSettingsRoutes(); // DEPRECATED: Merged into users.js
 const performanceRoutes = new PerformanceRoutes();
 const operationsRoutes = new OperationsRoutes();
 const tradingViewWebhookRoutes = new TradingViewWebhookRoutes();
@@ -44,7 +44,7 @@ const setDbPoolManager = (dbPoolManager) => {
     // publicPlansRoutes.setDbPoolManager(dbPoolManager); // Module not available
     stripeWebhooksRoutes.setDbPoolManager(dbPoolManager);
     userSettingsRoutes.setDbPoolManager(dbPoolManager);
-    userExchangeSettingsRoutes.setDbPoolManager(dbPoolManager);
+    // userExchangeSettingsRoutes.setDbPoolManager(dbPoolManager); // DEPRECATED: Merged into users.js
     tradingViewWebhookRoutes.setDbPoolManager(dbPoolManager);
     // FIXED: Add performance and operations routes database setup
     performanceRoutes.setDbPoolManager(dbPoolManager);
@@ -156,7 +156,7 @@ router.get('/operations-all-test', async (req, res) => {
 // Route modules
 router.use('/auth', authRoutes.getRouter());
 router.use('/user-settings', userSettingsRoutes.getRouter());
-router.use('/user/settings', userExchangeSettingsRoutes.getRouter());
+// router.use('/user/settings', userExchangeSettingsRoutes.getRouter()); // DEPRECATED: Merged into users.js
 router.use('/trading', tradingRoutes.getRouter());
 router.use('/financial', financialRoutes.getRouter());
 router.use('/stripe', stripeRoutes.getRouter());

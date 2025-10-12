@@ -595,32 +595,35 @@ class BybitService {
             if (data.result && data.result.list) {
                 return {
                     success: true,
-                    data: data.result.list.map(account => ({
-                        accountType: account.accountType,
-                        totalEquity: parseFloat(account.totalEquity),
-                        accountIMRate: parseFloat(account.accountIMRate),
-                        totalMarginBalance: parseFloat(account.totalMarginBalance),
-                        totalAvailableBalance: parseFloat(account.totalAvailableBalance),
-                        totalPerpUPL: parseFloat(account.totalPerpUPL),
-                        totalInitialMargin: parseFloat(account.totalInitialMargin),
-                        totalPositionIM: parseFloat(account.totalPositionIM),
-                        totalMaintenanceMargin: parseFloat(account.totalMaintenanceMargin),
-                        coins: account.coins.map(coin => ({
-                            coin: coin.coin,
-                            walletBalance: parseFloat(coin.walletBalance),
-                            transferBalance: parseFloat(coin.transferBalance),
-                            bonus: parseFloat(coin.bonus),
-                            availableToWithdraw: parseFloat(coin.availableToWithdraw),
-                            availableToBorrow: parseFloat(coin.availableToBorrow),
-                            accruedInterest: parseFloat(coin.accruedInterest),
-                            totalOrderIM: parseFloat(coin.totalOrderIM),
-                            totalPositionIM: parseFloat(coin.totalPositionIM),
-                            totalPositionMM: parseFloat(coin.totalPositionMM),
-                            unrealisedPnl: parseFloat(coin.unrealisedPnl),
-                            cumRealisedPnl: parseFloat(coin.cumRealisedPnl),
-                            used: parseFloat(coin.used)
+                    result: {
+                        list: data.result.list.map(account => ({
+                            accountType: account.accountType,
+                            totalEquity: parseFloat(account.totalEquity || 0),
+                            totalWalletBalance: parseFloat(account.totalWalletBalance || 0),
+                            totalAvailableBalance: parseFloat(account.totalAvailableBalance || 0),
+                            totalMarginBalance: parseFloat(account.totalMarginBalance || 0),
+                            accountIMRate: parseFloat(account.accountIMRate || 0),
+                            totalPerpUPL: parseFloat(account.totalPerpUPL || 0),
+                            totalInitialMargin: parseFloat(account.totalInitialMargin || 0),
+                            totalPositionIM: parseFloat(account.totalPositionIM || 0),
+                            totalMaintenanceMargin: parseFloat(account.totalMaintenanceMargin || 0),
+                            coin: (account.coin || []).map(coin => ({
+                                coin: coin.coin,
+                                walletBalance: parseFloat(coin.walletBalance || 0),
+                                transferBalance: parseFloat(coin.transferBalance || 0),
+                                bonus: parseFloat(coin.bonus || 0),
+                                availableToWithdraw: parseFloat(coin.availableToWithdraw || 0),
+                                availableToBorrow: parseFloat(coin.availableToBorrow || 0),
+                                accruedInterest: parseFloat(coin.accruedInterest || 0),
+                                totalOrderIM: parseFloat(coin.totalOrderIM || 0),
+                                totalPositionIM: parseFloat(coin.totalPositionIM || 0),
+                                totalPositionMM: parseFloat(coin.totalPositionMM || 0),
+                                unrealisedPnl: parseFloat(coin.unrealisedPnl || 0),
+                                cumRealisedPnl: parseFloat(coin.cumRealisedPnl || 0),
+                                equity: parseFloat(coin.equity || 0)
+                            }))
                         }))
-                    })),
+                    },
                     timestamp: Date.now()
                 };
             }

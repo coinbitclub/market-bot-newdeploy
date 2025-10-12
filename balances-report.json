@@ -1,0 +1,43 @@
+{
+  "generated_at": "2025-10-12T19:22:51.423Z",
+  "total_users": 2,
+  "users_with_keys": 1,
+  "users_with_balances": 0,
+  "total_system_balance": 0,
+  "exchange_summary": {
+    "binance": {
+      "total": 0,
+      "users": 0
+    },
+    "bybit": {
+      "total": 0,
+      "users": 0
+    }
+  },
+  "user_balances": [
+    {
+      "user_id": 1,
+      "email": "admin@coinbitclub.com",
+      "user_type": "ADMIN",
+      "binance": {
+        "error": "Request failed with status code 400",
+        "total_equity": 0
+      },
+      "bybit": {
+        "error": "Empty response",
+        "total_equity": 0
+      },
+      "total_usd": 0,
+      "status": "partial_error"
+    },
+    {
+      "user_id": 2,
+      "email": "stuartyang1130@gmail.com",
+      "user_type": "USER",
+      "binance": null,
+      "bybit": null,
+      "total_usd": 0,
+      "status": "no_keys"
+    }
+  ]
+}

@@ -5,16 +5,21 @@
 
 const express = require('express');
 const router = express.Router();
+const AuthMiddleware = require('../middleware/auth.middleware');
 
 class UserSettingsRoutes {
     constructor() {
         this.router = express.Router();
         this.dbPoolManager = null;
+        this.authMiddleware = new AuthMiddleware();
 
         this.setupRoutes();
     }
 
     setupRoutes() {
+        // Apply authentication middleware to all routes
+        this.router.use(this.authMiddleware.verifyToken());
+
         // Get user's preferred exchange
         this.router.get('/exchange', this.getPreferredExchange.bind(this));
 
