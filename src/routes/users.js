@@ -1550,6 +1550,17 @@ class UserSettingsRoutes {
             const user = userResult.rows[0];
             const exchange = user.preferred_exchange;
 
+            // Decrypt API secret
+            const apiKeyEncryption = require('../services/security/api-key-encryption');
+            const decryptedSecret = apiKeyEncryption.decrypt(user.api_secret);
+            
+            if (!decryptedSecret) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to decrypt API secret'
+                });
+            }
+
             // Fetch balance from exchange
             let balanceData;
             try {
@@ -1557,7 +1568,7 @@ class UserSettingsRoutes {
                     const BybitService = require('../services/exchange/bybit-service');
                     const service = new BybitService({
                         apiKey: user.api_key,
-                        apiSecret: user.api_secret
+                        apiSecret: decryptedSecret // Use decrypted secret
                     });
                     const balance = await service.getWalletBalance('UNIFIED');
                     balanceData = this.parseBybitBalance(balance);
@@ -1565,7 +1576,7 @@ class UserSettingsRoutes {
                     const BinanceService = require('../services/exchange/binance-service');
                     const service = new BinanceService({
                         apiKey: user.api_key,
-                        apiSecret: user.api_secret
+                        apiSecret: decryptedSecret // Use decrypted secret
                     });
                     const balance = await service.getAccountInfo();
                     balanceData = this.parseBinanceBalance(balance);
@@ -1645,21 +1656,34 @@ class UserSettingsRoutes {
                 has_keys: true
             };
 
+            // Load encryption service
+            const apiKeyEncryption = require('../services/security/api-key-encryption');
+
             // Fetch balances from each exchange in parallel
             const balancePromises = apiKeysResult.rows.map(async (keyData) => {
                 const exchange = keyData.exchange.toLowerCase();
                 
                 try {
+                    // Decrypt API secret
+                    const decryptedSecret = apiKeyEncryption.decrypt(keyData.api_secret);
+                    if (!decryptedSecret) {
+                        console.error(`❌ Failed to decrypt ${exchange} API secret`);
+                        throw new Error('Failed to decrypt API secret');
+                    }
+                    console.log(`🔓 ${exchange}: Decrypted secret (${decryptedSecret.length} chars), Key: ${keyData.api_key.substring(0, 10)}...`);
+
                     if (exchange === 'binance') {
                         const BinanceService = require('../services/exchange/binance-service');
                         const service = new BinanceService({
                             apiKey: keyData.api_key,
-                            apiSecret: keyData.api_secret,
+                            apiSecret: decryptedSecret, // Use decrypted secret
                             isTestnet: keyData.environment === 'testnet'
                         });
 
                         const balance = await service.getAccountInfo();
+                        console.log(`📊 Binance raw response:`, JSON.stringify(balance).substring(0, 200) + '...');
                         const parsedBalance = this.parseBinanceBalance({ success: true, result: balance });
+                        console.log(`💰 Binance parsed: equity=${parsedBalance.total_equity}, coins=${parsedBalance.coins.length}`);
                         balances.binance = {
                             ...parsedBalance,
                             environment: keyData.environment
@@ -1669,12 +1693,14 @@ class UserSettingsRoutes {
                         const BybitService = require('../services/exchange/bybit-service');
                         const service = new BybitService({
                             apiKey: keyData.api_key,
-                            apiSecret: keyData.api_secret,
+                            apiSecret: decryptedSecret, // Use decrypted secret
                             isTestnet: keyData.environment === 'testnet'
                         });
 
                         const balance = await service.getWalletBalance('UNIFIED');
+                        console.log(`📊 Bybit raw response:`, JSON.stringify(balance).substring(0, 200) + '...');
                         const parsedBalance = this.parseBybitBalance(balance);
+                        console.log(`💰 Bybit parsed: equity=${parsedBalance.total_equity}, coins=${parsedBalance.coins.length}`);
                         balances.bybit = {
                             ...parsedBalance,
                             environment: keyData.environment
