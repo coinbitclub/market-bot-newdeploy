@@ -1,311 +1,121 @@
 /**
- * 🔥 BYBIT API SERVICE - REAL EXCHANGE INTEGRATION
- * Handles real market data fetching and trading operations
+ * 🔥 BYBIT API SERVICE - bybit-api RestClientV5 wrapper
+ * Uses user credentials from DB; testnet/mainnet controlled by env BYBIT_TESTNET
  */
 
-const axios = require('axios');
-const crypto = require('crypto');
+const { RestClientV5 } = require('bybit-api');
 
 class BybitService {
     /**
-     * @param {Object} credentials - Optional user credentials
-     * @param {string} credentials.apiKey - User's API key
-     * @param {string} credentials.apiSecret - User's API secret
-     * @param {boolean} credentials.isTestnet - Whether to use testnet (optional)
+     * @param {Object} credentials - User credentials from DB
+     * @param {string} credentials.apiKey
+     * @param {string} credentials.apiSecret
      */
     constructor(credentials = null) {
-        this.baseURL = 'https://api.bybit.com';
-        this.testnetURL = 'https://api-testnet.bybit.com';
+        this.isTestnet = process.env.BYBIT_TESTNET === 'true';
 
-        // Determine if using testnet
-        if (credentials && credentials.isTestnet !== undefined) {
-            this.isTestnet = credentials.isTestnet;
-        } else {
-            this.isTestnet = process.env.BYBIT_TESTNET === 'true';
-        }
-
-        // Use provided credentials or fallback to environment variables
         if (credentials && credentials.apiKey && credentials.apiSecret) {
-            // Use user-provided credentials
-            this.apiKey = credentials.apiKey;
-            this.apiSecret = credentials.apiSecret;
-            this.isUserCredentials = true;
-        } else {
-            this.apiKey = process.env.BYBIT_API_KEY;
-            this.apiSecret = process.env.BYBIT_API_SECRET;
-            this.isUserCredentials = false;
-        }
-
-        this.currentURL = this.isTestnet ? this.testnetURL : this.baseURL;
-
-        console.log(`🔥 Bybit Service initialized - ${this.isTestnet ? 'TESTNET' : 'MAINNET'} - ${this.isUserCredentials ? 'USER CREDENTIALS' : 'ENV CREDENTIALS'}`);
-        if (this.isTestnet && this.apiKey) {
-            console.log(`🔑 Using Bybit API key: ${this.apiKey.substring(0, 8)}...`);
-        }
-    }
-
-    /**
-     * Generate signature for authenticated requests (Bybit V5 API)
-     * @param {string} timestamp - Timestamp in milliseconds
-     * @param {string} recvWindow - Receive window in milliseconds
-     * @param {string} method - HTTP method (GET or POST)
-     * @param {Object} params - Request parameters
-     * @returns {string} HMAC SHA256 signature
-     */
-    generateSignature(timestamp, recvWindow, method, params) {
-        let paramStr = '';
-
-        if (method === 'GET') {
-            // For GET requests: use query string (without '?')
-            if (Object.keys(params).length > 0) {
-                paramStr = new URLSearchParams(params).toString();
-            }
-        } else {
-            // For POST/PUT/DELETE requests: use raw JSON body
-            if (Object.keys(params).length > 0) {
-                paramStr = JSON.stringify(params);
-            }
-        }
-
-        // Bybit V5 signature: timestamp + apiKey + recvWindow + paramStr
-        const signString = timestamp + this.apiKey + recvWindow + paramStr;
-        return crypto.createHmac('sha256', this.apiSecret).update(signString).digest('hex');
-    }
-
-    /**
-     * Get server time for synchronization
-     */
-    async getServerTime() {
-        try {
-            const response = await axios({
-                method: 'GET',
-                url: `${this.currentURL}/v5/market/time`,
-                timeout: 5000
+            this.client = new RestClientV5({                
+                key: credentials.apiKey,                
+                secret: credentials.apiSecret,
+                testnet: this.isTestnet,
+                demoTrading: false,
+                parseAPIRateLimits: true,
+                // CRITICAL: Increase recv_window to handle clock skew (60 seconds)
+                recv_window: 60000,
+                // Enable automatic server time synchronization
+                enable_time_sync: true,
+                // Sync server time every 30 seconds
+                sync_interval_ms: 30000,
+                // Strict validation off for better error messages
+                strict_validation: false
             });
-
-            // Bybit V5 returns time in different formats
-            if (response.data && response.data.result) {
-                // Check for timeSecond (in seconds) or timeNano (in nanoseconds)
-                if (response.data.result.timeSecond) {
-                    return parseInt(response.data.result.timeSecond) * 1000;
-                } else if (response.data.result.timeNano) {
-                    return Math.floor(parseInt(response.data.result.timeNano) / 1000000);
-                }
-            }
-
-            // If direct time property exists
-            if (response.data && response.data.time) {
-                return parseInt(response.data.time);
-            }
-
-            console.warn('⚠️ Unexpected server time format, using local time');
-            return Date.now();
-        } catch (error) {
-            console.warn('⚠️ Could not get server time, using local time');
-            return Date.now();
-        }
-    }
-
-    /**
-     * Make authenticated request to Bybit API
-     */
-    async makeAuthenticatedRequest(endpoint, params = {}, method = 'GET') {
-        try {
-            if (!this.apiKey || !this.apiSecret) {
-                throw new Error('Bybit API credentials not configured');
-            }
-
-            // Use server time for better synchronization
-            const serverTime = await this.getServerTime();
-            const timestamp = serverTime.toString(); // Milliseconds as required by Bybit V5 API
-            const recvWindow = '10000'; // 10 second window for clock skew tolerance
-
-            // Generate signature with correct method-specific format
-            const signature = this.generateSignature(timestamp, recvWindow, method, params);
-
-            const config = {
-                method,
-                url: `${this.currentURL}${endpoint}`,
-                headers: {
-                    'X-BAPI-API-KEY': this.apiKey,
-                    'X-BAPI-SIGN': signature,
-                    'X-BAPI-SIGN-TYPE': '2',
-                    'X-BAPI-TIMESTAMP': timestamp,
-                    'X-BAPI-RECV-WINDOW': recvWindow,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 10000
-            };
-
-            if (method === 'GET') {
-                config.params = params;
-            } else {
-                config.data = params;
-            }
-
-            const response = await axios(config);
-            return response.data;
-        } catch (error) {
-            console.error('❌ Bybit API Error:', error.response?.data || error.message);
-            throw error;
-        }
-    }
-
-    /**
-     * Make public request to Bybit API
-     */
-    async makePublicRequest(endpoint, params = {}) {
-        try {
-            const response = await axios({
-                method: 'GET',
-                url: `${this.currentURL}${endpoint}`,
-                params,
-                timeout: 10000
+            
+            this.hasCredentials = true;
+            console.log(`🔥 Bybit Service initialized - ${this.isTestnet ? 'TESTNET' : 'MAINNET'} - USER CREDENTIALS`);
+            console.log(`   ⚙️  recv_window: 60000ms, time_sync: enabled`);
+        } else {
+            // Public-only client (no credentials) for public endpoints
+            this.client = new RestClientV5({ 
+                testnet: this.isTestnet,
+                enable_time_sync: true
             });
-
-            return response.data;
-        } catch (error) {
-            console.error('❌ Bybit Public API Error:', error.response?.data || error.message);
-            throw error;
+            this.hasCredentials = false;
+            console.log(`🔥 Bybit Service initialized - ${this.isTestnet ? 'TESTNET' : 'MAINNET'} - PUBLIC ONLY`);
         }
     }
 
-    /**
-     * Get real-time price for a symbol
-     */
     async getSymbolPrice(symbol) {
         try {
-            const data = await this.makePublicRequest('/v5/market/tickers', {
-                category: 'spot',
-                symbol: symbol.toUpperCase()
-            });
-
-            if (data.result && data.result.list && data.result.list.length > 0) {
-                const ticker = data.result.list[0];
-                return {
-                    success: true,
-                    symbol: ticker.symbol,
-                    price: parseFloat(ticker.lastPrice),
-                    bidPrice: parseFloat(ticker.bid1Price),
-                    askPrice: parseFloat(ticker.ask1Price),
-                    volume24h: parseFloat(ticker.volume24h),
-                    priceChange24h: parseFloat(ticker.price24hPcnt),
-                    timestamp: Date.now()
-                };
+            const data = await this.client.getTickers({ category: 'linear', symbol: symbol.toUpperCase() });
+            const list = data.result?.list || [];
+            if (list.length > 0) {
+                const t = list[0];
+                return { success: true, symbol: t.symbol, price: parseFloat(t.lastPrice), bidPrice: parseFloat(t.bid1Price), askPrice: parseFloat(t.ask1Price), timestamp: Date.now() };
             }
-            return {
-                success: false,
-                error: 'Symbol not found'
-            };
+            return { success: false, error: 'Symbol not found' };
         } catch (error) {
             console.error(`❌ Error fetching price for ${symbol}:`, error.message);
-            return {
-                success: false,
-                error: error.message
-            };
+            return { success: false, error: error.message };
         }
     }
 
-    /**
-     * Get 24hr ticker statistics
-     */
     async get24hrTicker(symbol) {
         try {
-            const data = await this.makePublicRequest('/v5/market/tickers', {
-                category: 'spot',
-                symbol: symbol.toUpperCase()
-            });
-
-            if (data.result && data.result.list && data.result.list.length > 0) {
-                const ticker = data.result.list[0];
+            const data = await this.client.getTickers({ category: 'linear', symbol: symbol.toUpperCase() });
+            const list = data.result?.list || [];
+            if (list.length > 0) {
+                const t = list[0];
                 return {
                     success: true,
                     data: {
-                        symbol: ticker.symbol,
-                        lastPrice: parseFloat(ticker.lastPrice),
-                        bid1Price: parseFloat(ticker.bid1Price),
-                        bid1Size: parseFloat(ticker.bid1Size),
-                        ask1Price: parseFloat(ticker.ask1Price),
-                        ask1Size: parseFloat(ticker.ask1Size),
-                        volume24h: parseFloat(ticker.volume24h),
-                        turnover24h: parseFloat(ticker.turnover24h),
-                        price24hPcnt: parseFloat(ticker.price24hPcnt),
-                        priceChangePercent: parseFloat(ticker.price24hPcnt) * 100,
-                        highPrice24h: parseFloat(ticker.highPrice24h),
-                        lowPrice24h: parseFloat(ticker.lowPrice24h),
-                        prevPrice24h: parseFloat(ticker.prevPrice24h),
-                        openInterest: parseFloat(ticker.openInterest),
-                        nextFundingTime: ticker.nextFundingTime,
-                        fundingRate: parseFloat(ticker.fundingRate),
+                        symbol: t.symbol,
+                        lastPrice: parseFloat(t.lastPrice),
+                        bid1Price: parseFloat(t.bid1Price),
+                        ask1Price: parseFloat(t.ask1Price),
+                        volume24h: parseFloat(t.volume24h),
+                        turnover24h: parseFloat(t.turnover24h),
+                        price24hPcnt: parseFloat(t.price24hPcnt),
+                        priceChangePercent: parseFloat(t.price24hPcnt) * 100,
+                        highPrice24h: parseFloat(t.highPrice24h),
+                        lowPrice24h: parseFloat(t.lowPrice24h),
                         timestamp: Date.now()
                     }
                 };
             }
-            return {
-                success: false,
-                error: 'Symbol not found'
-            };
+            return { success: false, error: 'Symbol not found' };
         } catch (error) {
             console.error(`❌ Error fetching 24hr ticker for ${symbol}:`, error.message);
-            return {
-                success: false,
-                error: error.message
-            };
+            return { success: false, error: error.message };
         }
     }
 
-    /**
-     * Get account information
-     */
     async getAccountInfo() {
         try {
-            const data = await this.makeAuthenticatedRequest('/v5/account/wallet-balance', {
-                accountType: 'UNIFIED'
-            });
-
-            console.log('📊 Account Info Response:', JSON.stringify(data, null, 2));
-
-            if (data.retCode === 0 && data.result && data.result.list && data.result.list.length > 0) {
-                const account = data.result.list[0];
-                return {
-                    success: true,
-                    data: {
-                        accountType: account.accountType,
-                        marginMode: account.marginMode,
-                        updatedTime: account.updatedTime,
-                        totalWalletBalance: parseFloat(account.totalWalletBalance || 0),
-                        totalUnrealisedPnl: parseFloat(account.totalUnrealisedPnl || 0),
-                        totalMarginBalance: parseFloat(account.totalMarginBalance || 0),
-                        totalMaintMargin: parseFloat(account.totalMaintMargin || 0),
-                        totalInitialMargin: parseFloat(account.totalInitialMargin || 0),
-                        totalAvailableBalance: parseFloat(account.totalAvailableBalance || 0),
-                        totalPerpUPL: parseFloat(account.totalPerpUPL || 0),
-                        totalPositionIM: parseFloat(account.totalPositionIM || 0),
-                        totalPositionMM: parseFloat(account.totalPositionMM || 0),
-                        totalTakeProfitLiqValue: parseFloat(account.totalTakeProfitLiqValue || 0),
-                        totalStopLossLiqValue: parseFloat(account.totalStopLossLiqValue || 0),
-                        coins: (account.coins || []).map(coin => ({
-                            coin: coin.coin,
-                            walletBalance: parseFloat(coin.walletBalance || 0),
-                            transferBalance: parseFloat(coin.transferBalance || 0),
-                            bonus: parseFloat(coin.bonus || 0),
-                            availableToWithdraw: parseFloat(coin.availableToWithdraw || 0),
-                            availableToBorrow: parseFloat(coin.availableToBorrow || 0),
-                            accruedInterest: parseFloat(coin.accruedInterest || 0),
-                            totalOrderIM: parseFloat(coin.totalOrderIM || 0),
-                            totalPositionIM: parseFloat(coin.totalPositionIM || 0),
-                            totalPositionMM: parseFloat(coin.totalPositionMM || 0),
-                            unrealisedPnl: parseFloat(coin.unrealisedPnl || 0),
-                            cumRealisedPnl: parseFloat(coin.cumRealisedPnl || 0),
-                            used: parseFloat(coin.used || 0)
-                        }))
-                    },
-                    timestamp: Date.now()
+            if (!this.hasCredentials) {
+                throw new Error('Bybit API credentials not configured');
+            }
+            
+            const result = await this.client.getAccountInfo();
+            
+            if (result.retCode === 0 && result.result) {
+                console.log('✅ Successfully retrieved Bybit account info');
+                return { 
+                    success: true, 
+                    data: result.result,
+                    timestamp: Date.now() 
                 };
-            } else if (data.retCode === 10002) {
-                return { success: false, error: 'Timestamp synchronization issue' };
+            } else if (result.retCode === 10002) {
+                console.log(`❌ Error 10002: ${result.retMsg}`);
+                return { 
+                    success: false, 
+                    error: `Timestamp sync error: ${result.retMsg}` 
+                };
             } else {
-                return { success: false, error: data.retMsg || 'Account information not available' };
+                return { 
+                    success: false, 
+                    error: result.retMsg || 'Account info not available' 
+                };
             }
         } catch (error) {
             console.error('❌ Error fetching account info:', error.message);
@@ -313,269 +123,196 @@ class BybitService {
         }
     }
 
-    /**
-     * Get open orders
-     */
-    async getOpenOrders(symbol = null, category = 'spot') {
+    async getAccountBalance() {
         try {
-            const params = { category };
-            if (symbol) params.symbol = symbol.toUpperCase();
-
-            const data = await this.makeAuthenticatedRequest('/v5/order/realtime', params);
-
-            if (data.result && data.result.list) {
-                return data.result.list.map(order => ({
-                    orderId: order.orderId,
-                    orderLinkId: order.orderLinkId,
-                    blockTradeId: order.blockTradeId,
-                    symbol: order.symbol,
-                    price: parseFloat(order.price),
-                    qty: parseFloat(order.qty),
-                    side: order.side,
-                    isLeverage: order.isLeverage,
-                    positionIdx: order.positionIdx,
-                    orderStatus: order.orderStatus,
-                    cancelType: order.cancelType,
-                    rejectReason: order.rejectReason,
-                    avgPrice: parseFloat(order.avgPrice),
-                    leavesQty: parseFloat(order.leavesQty),
-                    leavesValue: parseFloat(order.leavesValue),
-                    cumExecQty: parseFloat(order.cumExecQty),
-                    cumExecValue: parseFloat(order.cumExecValue),
-                    cumExecFee: parseFloat(order.cumExecFee),
-                    timeInForce: order.timeInForce,
-                    orderType: order.orderType,
-                    stopOrderType: order.stopOrderType,
-                    orderIv: order.orderIv,
-                    triggerPrice: parseFloat(order.triggerPrice),
-                    takeProfit: parseFloat(order.takeProfit),
-                    stopLoss: parseFloat(order.stopLoss),
-                    tpLimitPrice: parseFloat(order.tpLimitPrice),
-                    slLimitPrice: parseFloat(order.slLimitPrice),
-                    tpTriggerBy: order.tpTriggerBy,
-                    slTriggerBy: order.slTriggerBy,
-                    triggerDirection: order.triggerDirection,
-                    triggerBy: order.triggerBy,
-                    lastPriceOnCreated: parseFloat(order.lastPriceOnCreated),
-                    reduceOnly: order.reduceOnly,
-                    closeOnTrigger: order.closeOnTrigger,
-                    smpType: order.smpType,
-                    smpGroup: order.smpGroup,
-                    smpOrderId: order.smpOrderId,
-                    createdTime: order.createdTime,
-                    updatedTime: order.updatedTime,
-                    timestamp: Date.now()
-                }));
+            if (!this.hasCredentials) {
+                throw new Error('Bybit API credentials not configured');
             }
-            return [];
+            
+            console.log('🔍 Accessing Bybit Futures account...');
+            console.log('   🎯 FUTURES TRADING ONLY - UNIFIED Trading Account (UTA)');
+            
+            // FUTURES ONLY - UNIFIED Trading Account (UTA) for Futures/Linear trading
+            try {
+                console.log('   📈 Fetching UNIFIED account info...');
+                const data = await this.client.getWalletBalance({ accountType: 'UNIFIED' });
+                const list = data.result?.list || [];
+                const retCode = data.retCode || data.ret_code;
+                
+                // Check for success - retCode 0 or undefined (some responses don't include retCode on success)
+                if (retCode === 0 || (retCode === undefined && list.length >= 0)) {
+                    console.log(`✅ Successfully accessed Bybit UNIFIED account (Futures/Linear trading)`);
+                    
+                    if (list.length > 0) {
+                        const account = list[0];
+                        return { 
+                            success: true, 
+                            result: { 
+                                ...account, 
+                                accountType: 'UNIFIED',
+                                balances: (account.coin || []).map(c => ({
+                                    asset: c.coin,
+                                    free: parseFloat(c.availableToWithdraw || c.walletBalance || 0),
+                                    locked: parseFloat(c.locked || 0),
+                                    walletBalance: parseFloat(c.walletBalance || 0)
+                                }))
+                            }, 
+                            timestamp: Date.now() 
+                        };
+                    } else {
+                        // Empty account but API works
+                        console.log(`   ℹ️  UNIFIED account is empty (no balances yet)`);
+                        return { 
+                            success: true, 
+                            result: { 
+                                accountType: 'UNIFIED',
+                                totalEquity: '0',
+                                totalWalletBalance: '0',
+                                totalAvailableBalance: '0',
+                                balances: [],
+                                isEmpty: true
+                            }, 
+                            timestamp: Date.now() 
+                        };
+                    }
+                } else if (retCode === 10001) {
+                    // Error 10001 usually means trying wrong account type for UTA
+                    console.log(`   ℹ️  This is a UTA account (Unified Trading Account)`);
+                } else if (retCode === 10002) {
+                    console.log(`   ❌ Error 10002: ${data.retMsg || 'Timestamp or permission issue'}`);
+                    return { 
+                        success: false, 
+                        error: `Timestamp sync error: ${data.retMsg}` 
+                    };
+                }
+            } catch (unifiedError) {
+                console.log(`❌ UNIFIED account NOT accessible: ${unifiedError.message}`);
+                
+                // Check if it's a permission error
+                if (unifiedError.message && unifiedError.message.includes('Invalid API key')) {
+                    console.log('\n   ⚠️  FUTURES TRADING NOT ENABLED!');
+                    console.log('   📋 To enable Futures trading:');
+                    console.log('      1. Go to: https://www.bybit.com/app/user/api-management');
+                    console.log('      2. Edit your API key');
+                    console.log('      3. Check ✅ "Derivatives" permission');
+                    console.log('      4. Ensure IP restriction allows your IP (or set Unrestricted)');
+                    console.log('      5. Save and wait 2 minutes');
+                    console.log('   🚫 NO SPOT FALLBACK - Futures trading is required!\n');
+                }
+                
+                // NO SPOT FALLBACK - Throw error directly
+                return { 
+                    success: false, 
+                    error: `Futures trading required: ${unifiedError.message}` 
+                };
+            }
+        } catch (error) {
+            console.error('❌ Error fetching account balance:', error.message);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getOpenOrders(symbol = null, category = 'linear') {
+        try {
+            if (!this.hasCredentials) {
+                throw new Error('Bybit API credentials not configured');
+            }
+            const data = await this.client.getActiveOrders({ 
+                category, 
+                symbol: symbol ? symbol.toUpperCase() : undefined 
+            });
+            const list = data.result?.list || [];
+            return list.map(order => ({
+                orderId: order.orderId,
+                orderLinkId: order.orderLinkId,
+                symbol: order.symbol,
+                price: parseFloat(order.price),
+                qty: parseFloat(order.qty),
+                side: order.side,
+                orderStatus: order.orderStatus,
+                avgPrice: parseFloat(order.avgPrice),
+                timeInForce: order.timeInForce,
+                orderType: order.orderType,
+                createdTime: order.createdTime,
+                updatedTime: order.updatedTime,
+                timestamp: Date.now()
+            }));
         } catch (error) {
             console.error('❌ Error fetching open orders:', error.message);
             throw error;
         }
     }
 
-    /**
-     * Place a new order
-     */
     async placeOrder(orderParams) {
         try {
-            const {
-                category = 'spot',
-                symbol,
-                side,
-                orderType = 'Market',
-                qty,
-                price = null,
-                timeInForce = 'GTC',
-                orderLinkId = null,
-                isLeverage = false,
-                orderFilter = 'Order',
-                triggerPrice = null,
-                triggerDirection = null,
-                triggerBy = null,
-                orderIv = null,
-                positionIdx = null,
-                takeProfit = null,
-                stopLoss = null,
-                tpTriggerBy = null,
-                slTriggerBy = null,
-                tpLimitPrice = null,
-                slLimitPrice = null,
-                tpOrderType = null,
-                slOrderType = null,
-                reduceOnly = false
-            } = orderParams;
-
-            const params = {
-                category,
-                symbol: symbol.toUpperCase(),
-                side: side.charAt(0).toUpperCase() + side.slice(1).toLowerCase(),
-                orderType,
-                qty: qty.toString(),
-                timeInForce,
-                orderFilter
-            };
-
+            if (!this.hasCredentials) {
+                throw new Error('Bybit API credentials not configured');
+            }
+            const { category = 'linear', symbol, side, orderType = 'Market', qty, price, timeInForce = 'GTC', orderLinkId } = orderParams;
+            const params = { category, symbol: symbol.toUpperCase(), side, orderType, qty: qty.toString(), timeInForce };
             if (price) params.price = price.toString();
             if (orderLinkId) params.orderLinkId = orderLinkId;
-            if (isLeverage) params.isLeverage = isLeverage.toString();
-            if (triggerPrice) params.triggerPrice = triggerPrice.toString();
-            if (triggerDirection) params.triggerDirection = triggerDirection.toString();
-            if (triggerBy) params.triggerBy = triggerBy;
-            if (orderIv) params.orderIv = orderIv.toString();
-            if (positionIdx) params.positionIdx = positionIdx.toString();
-            if (takeProfit) params.takeProfit = takeProfit.toString();
-            if (stopLoss) params.stopLoss = stopLoss.toString();
-            if (tpTriggerBy) params.tpTriggerBy = tpTriggerBy;
-            if (slTriggerBy) params.slTriggerBy = slTriggerBy;
-            if (tpLimitPrice) params.tpLimitPrice = tpLimitPrice.toString();
-            if (slLimitPrice) params.slLimitPrice = slLimitPrice.toString();
-            if (tpOrderType) params.tpOrderType = tpOrderType;
-            if (slOrderType) params.slOrderType = slOrderType;
-            if (reduceOnly) params.reduceOnly = reduceOnly.toString();
 
-            const data = await this.makeAuthenticatedRequest('/v5/order/create', params, 'POST');
-
-            if (data.result) {
-                return {
-                    orderId: data.result.orderId,
-                    orderLinkId: data.result.orderLinkId,
-                    timestamp: Date.now()
-                };
-            }
-            throw new Error('Order placement failed');
+            const data = await this.client.placeOrder(params);
+            const result = data.result;
+            return { success: true, orderId: result.orderId, orderLinkId: result.orderLinkId, timestamp: Date.now() };
         } catch (error) {
-            console.error('❌ Error placing order:', error.response?.data || error.message);
+            console.error('❌ Error placing order:', error.message);
             throw error;
         }
     }
 
-    /**
-     * Cancel an order
-     */
     async cancelOrder(symbol, orderId, category = 'spot') {
         try {
-            const data = await this.makeAuthenticatedRequest('/v5/order/cancel', {
-                category,
-                symbol: symbol.toUpperCase(),
-                orderId: orderId.toString()
-            }, 'POST');
-
-            if (data.result) {
-                return {
-                    orderId: data.result.orderId,
-                    orderLinkId: data.result.orderLinkId,
-                    timestamp: Date.now()
-                };
+            if (!this.hasCredentials) {
+                throw new Error('Bybit API credentials not configured');
             }
-            throw new Error('Order cancellation failed');
+            const data = await this.client.cancelOrder({ category, symbol: symbol.toUpperCase(), orderId: orderId.toString() });
+            return { success: true, orderId: data.result?.orderId, orderLinkId: data.result?.orderLinkId, timestamp: Date.now() };
         } catch (error) {
-            console.error('❌ Error canceling order:', error.response?.data || error.message);
+            console.error('❌ Error canceling order:', error.message);
             throw error;
         }
     }
 
-    /**
-     * Get instrument info (symbols, filters, etc.)
-     */
     async getInstrumentInfo(category = 'spot', symbol = null) {
         try {
-            const params = { category };
-            if (symbol) params.symbol = symbol.toUpperCase();
-
-            const data = await this.makePublicRequest('/v5/market/instruments-info', params);
-
-            if (data.result && data.result.list) {
-                return {
-                    category: data.result.category,
-                    list: data.result.list.map(instrument => ({
-                        symbol: instrument.symbol,
-                        baseCoin: instrument.baseCoin,
-                        quoteCoin: instrument.quoteCoin,
-                        innovation: instrument.innovation,
-                        status: instrument.status,
-                        marginTrading: instrument.marginTrading,
-                        lotSizeFilter: instrument.lotSizeFilter,
-                        priceFilter: instrument.priceFilter,
-                        contractType: instrument.contractType,
-                        launchTime: instrument.launchTime,
-                        deliveryTime: instrument.deliveryTime,
-                        deliveryFeeRate: instrument.deliveryFeeRate,
-                        priceScale: instrument.priceScale,
-                        leverageFilter: instrument.leverageFilter,
-                        presetType: instrument.presetType
-                    })),
-                    timestamp: Date.now()
-                };
-            }
-            throw new Error('Instrument info not available');
+            const data = await this.client.getInstrumentsInfo({ category, symbol: symbol ? symbol.toUpperCase() : undefined });
+            return { category: data.result?.category, list: data.result?.list || [], timestamp: Date.now() };
         } catch (error) {
             console.error('❌ Error fetching instrument info:', error.message);
             throw error;
         }
     }
 
-    /**
-     * Get kline/candlestick data
-     */
     async getKlines(symbol, interval = '1', limit = 100, category = 'spot') {
         try {
-            const data = await this.makePublicRequest('/v5/market/kline', {
-                category,
-                symbol: symbol.toUpperCase(),
-                interval,
-                limit
-            });
-
-            if (data.result && data.result.list) {
-                return data.result.list.map(kline => ({
-                    startTime: kline[0],
-                    openPrice: parseFloat(kline[1]),
-                    highPrice: parseFloat(kline[2]),
-                    lowPrice: parseFloat(kline[3]),
-                    closePrice: parseFloat(kline[4]),
-                    volume: parseFloat(kline[5]),
-                    turnover: parseFloat(kline[6])
-                }));
-            }
-            throw new Error('Kline data not available');
+            const data = await this.client.getKline({ category, symbol: symbol.toUpperCase(), interval, limit });
+            const list = data.result?.list || [];
+            return list.map(k => ({ startTime: k[0], openPrice: parseFloat(k[1]), highPrice: parseFloat(k[2]), lowPrice: parseFloat(k[3]), closePrice: parseFloat(k[4]), volume: parseFloat(k[5]) }));
         } catch (error) {
             console.error(`❌ Error fetching klines for ${symbol}:`, error.message);
             throw error;
         }
     }
 
-    /**
-     * Test API connectivity
-     */
     async testConnectivity() {
         try {
-            const data = await this.makePublicRequest('/v5/market/time');
-            return {
-                success: true,
-                message: 'Bybit API connectivity test successful',
-                serverTime: data.result?.timeSecond,
-                timestamp: Date.now()
-            };
+            const data = await this.client.getServerTime();
+            return { success: true, message: 'Bybit API connectivity test successful', serverTime: data.timeSecond || data.time, timestamp: Date.now() };
         } catch (error) {
-            return {
-                success: false,
-                message: `Bybit API connectivity test failed: ${error.message}`,
-                timestamp: Date.now()
-            };
+            return { success: false, message: `Bybit API connectivity test failed: ${error.message}`, timestamp: Date.now() };
         }
     }
 
-    /**
-     * Get server time details (public method for external use)
-     */
     async getServerTimeDetails() {
         try {
-            const data = await this.makePublicRequest('/v5/market/time');
-            return {
-                timeSecond: data.result?.timeSecond,
-                timeNano: data.result?.timeNano,
-                timestamp: Date.now()
+            const data = await this.client.getServerTime();
+            const result = data.result || data;
+            return { 
+                timeSecond: result.timeSecond || result.time, 
+                timeNano: result.timeNano, 
+                timestamp: Date.now() 
             };
         } catch (error) {
             console.error('❌ Error fetching server time:', error.message);
@@ -583,157 +320,40 @@ class BybitService {
         }
     }
 
-    /**
-     * Get wallet balance
-     */
     async getWalletBalance(accountType = 'UNIFIED') {
         try {
-            const data = await this.makeAuthenticatedRequest('/v5/account/wallet-balance', {
-                accountType: accountType
-            });
-
-            if (data.result && data.result.list) {
-                return {
-                    success: true,
-                    result: {
-                        list: data.result.list.map(account => ({
-                            accountType: account.accountType,
-                            totalEquity: parseFloat(account.totalEquity || 0),
-                            totalWalletBalance: parseFloat(account.totalWalletBalance || 0),
-                            totalAvailableBalance: parseFloat(account.totalAvailableBalance || 0),
-                            totalMarginBalance: parseFloat(account.totalMarginBalance || 0),
-                            accountIMRate: parseFloat(account.accountIMRate || 0),
-                            totalPerpUPL: parseFloat(account.totalPerpUPL || 0),
-                            totalInitialMargin: parseFloat(account.totalInitialMargin || 0),
-                            totalPositionIM: parseFloat(account.totalPositionIM || 0),
-                            totalMaintenanceMargin: parseFloat(account.totalMaintenanceMargin || 0),
-                            coin: (account.coin || []).map(coin => ({
-                                coin: coin.coin,
-                                walletBalance: parseFloat(coin.walletBalance || 0),
-                                transferBalance: parseFloat(coin.transferBalance || 0),
-                                bonus: parseFloat(coin.bonus || 0),
-                                availableToWithdraw: parseFloat(coin.availableToWithdraw || 0),
-                                availableToBorrow: parseFloat(coin.availableToBorrow || 0),
-                                accruedInterest: parseFloat(coin.accruedInterest || 0),
-                                totalOrderIM: parseFloat(coin.totalOrderIM || 0),
-                                totalPositionIM: parseFloat(coin.totalPositionIM || 0),
-                                totalPositionMM: parseFloat(coin.totalPositionMM || 0),
-                                unrealisedPnl: parseFloat(coin.unrealisedPnl || 0),
-                                cumRealisedPnl: parseFloat(coin.cumRealisedPnl || 0),
-                                equity: parseFloat(coin.equity || 0)
-                            }))
-                        }))
-                    },
-                    timestamp: Date.now()
-                };
+            if (!this.hasCredentials) {
+                throw new Error('Bybit API credentials not configured');
             }
-            return { success: false, error: 'No wallet balance data available' };
+            const data = await this.client.getWalletBalance({ accountType });
+            const list = data.result?.list || [];
+            return { success: true, result: { list }, timestamp: Date.now() };
         } catch (error) {
             console.error('❌ Error fetching wallet balance:', error.message);
             return { success: false, error: error.message };
         }
     }
 
-    /**
-     * Get positions
-     */
     async getPositions(category = 'linear', symbol = null) {
         try {
-            const params = { category };
-            if (symbol) params.symbol = symbol.toUpperCase();
-
-            const data = await this.makeAuthenticatedRequest('/v5/position/list', params);
-
-            if (data.result && data.result.list) {
-                return {
-                    success: true,
-                    data: data.result.list.map(position => ({
-                        symbol: position.symbol,
-                        side: position.side,
-                        size: parseFloat(position.size),
-                        positionValue: parseFloat(position.positionValue),
-                        entryPrice: parseFloat(position.entryPrice),
-                        markPrice: parseFloat(position.markPrice),
-                        liqPrice: parseFloat(position.liqPrice),
-                        bustPrice: parseFloat(position.bustPrice),
-                        leverage: parseFloat(position.leverage),
-                        autoAddMargin: position.autoAddMargin,
-                        positionStatus: position.positionStatus,
-                        positionIdx: position.positionIdx,
-                        takeProfit: parseFloat(position.takeProfit),
-                        stopLoss: parseFloat(position.stopLoss),
-                        trailingStop: parseFloat(position.trailingStop),
-                        unrealisedPnl: parseFloat(position.unrealisedPnl),
-                        cumRealisedPnl: parseFloat(position.cumRealisedPnl),
-                        createdTime: position.createdTime,
-                        updatedTime: position.updatedTime
-                    })),
-                    timestamp: Date.now()
-                };
+            if (!this.hasCredentials) {
+                throw new Error('Bybit API credentials not configured');
             }
-            return { success: false, error: 'No positions data available' };
+            const data = await this.client.getPositionInfo({ category, symbol: symbol ? symbol.toUpperCase() : undefined });
+            return { success: true, data: data.result?.list || [], timestamp: Date.now() };
         } catch (error) {
             console.error('❌ Error fetching positions:', error.message);
             return { success: false, error: error.message };
         }
     }
 
-    /**
-     * Get order history
-     */
     async getOrderHistory(category = 'spot', symbol = null, limit = 50) {
         try {
-            const params = {
-                category,
-                limit: limit.toString()
-            };
-            if (symbol) params.symbol = symbol.toUpperCase();
-
-            const data = await this.makeAuthenticatedRequest('/v5/order/history', params);
-
-            if (data.result && data.result.list) {
-                return {
-                    success: true,
-                    data: data.result.list.map(order => ({
-                        orderId: order.orderId,
-                        orderLinkId: order.orderLinkId,
-                        blockTradeId: order.blockTradeId,
-                        symbol: order.symbol,
-                        price: parseFloat(order.price),
-                        qty: parseFloat(order.qty),
-                        side: order.side,
-                        isLeverage: order.isLeverage,
-                        positionIdx: order.positionIdx,
-                        orderStatus: order.orderStatus,
-                        cancelType: order.cancelType,
-                        rejectReason: order.rejectReason,
-                        avgPrice: parseFloat(order.avgPrice),
-                        leavesQty: parseFloat(order.leavesQty),
-                        leavesValue: parseFloat(order.leavesValue),
-                        cumExecQty: parseFloat(order.cumExecQty),
-                        cumExecValue: parseFloat(order.cumExecValue),
-                        cumExecFee: parseFloat(order.cumExecFee),
-                        timeInForce: order.timeInForce,
-                        orderType: order.orderType,
-                        stopOrderType: order.stopOrderType,
-                        orderIv: order.orderIv,
-                        triggerPrice: parseFloat(order.triggerPrice),
-                        takeProfit: parseFloat(order.takeProfit),
-                        stopLoss: parseFloat(order.stopLoss),
-                        tpTriggerBy: order.tpTriggerBy,
-                        slTriggerBy: order.slTriggerBy,
-                        triggerDirection: order.triggerDirection,
-                        triggerBy: order.triggerBy,
-                        lastPriceOnCreated: parseFloat(order.lastPriceOnCreated),
-                        reduceOnly: order.reduceOnly,
-                        closeOnTrigger: order.closeOnTrigger,
-                        createdTime: order.createdTime,
-                        updatedTime: order.updatedTime
-                    })),
-                    timestamp: Date.now()
-                };
+            if (!this.hasCredentials) {
+                throw new Error('Bybit API credentials not configured');
             }
-            return { success: false, error: 'No order history data available' };
+            const data = await this.client.getOrderHistory({ category, symbol: symbol ? symbol.toUpperCase() : undefined, limit });
+            return { success: true, data: data.result?.list || [], timestamp: Date.now() };
         } catch (error) {
             console.error('❌ Error fetching order history:', error.message);
             return { success: false, error: error.message };

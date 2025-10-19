@@ -107,7 +107,7 @@ class AuthRoutes {
 
             // Buscar usuário no banco
             const userResult = await this.dbPoolManager.executeRead(
-                'SELECT * FROM users WHERE email = $1 AND is_active = true',
+                'SELECT * FROM users WHERE email = $1',
                 [email]
             );
 
@@ -154,40 +154,54 @@ class AuthRoutes {
                 }
             }
 
-            // Reset login attempts
+            // Update last login time
             await this.dbPoolManager.executeWrite(
-                'UPDATE users SET login_attempts = 0, last_login_at = NOW() WHERE id = $1',
+                'UPDATE users SET last_login_at = NOW() WHERE id = $1',
                 [user.id]
             );
 
             // Gerar tokens
             const tokens = this.generateTokens(user);
 
-            // Criar sessão
-            const sessionId = crypto.randomUUID();
-            await this.dbPoolManager.executeWrite(
-                'INSERT INTO user_sessions (id, user_id, device_info, ip_address, expires_at) VALUES ($1, $2, $3, $4, $5)',
-                [
+            // Create session log entry
+            let sessionId = null;
+            try {
+                sessionId = crypto.randomUUID();
+                await this.dbPoolManager.executeWrite(`
+                    INSERT INTO user_sessions (
+                        id,
+                        user_id, 
+                        session_token, 
+                        device_info,
+                        ip_address, 
+                        user_agent,
+                        login_at,
+                        expires_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW() + INTERVAL '24 hours')
+                `, [
                     sessionId,
                     user.id,
-                    req.headers['user-agent'] || '',
+                    tokens.refreshToken.substring(0, 50), // Store partial token for identification
+                    req.headers['user-agent'] || 'Unknown',
                     req.ip || req.connection.remoteAddress,
-                    new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 horas
-                ]
-            );
+                    req.headers['user-agent'] || 'Unknown'
+                ]);
+            } catch (sessionError) {
+                // Non-critical - continue even if session logging fails
+                console.log('⚠️ Session logging failed (non-critical):', sessionError.message);
+            }
 
             res.json({
                 success: true,
-                sessionId,
+                ...(sessionId && { sessionId }),
                 ...tokens,
                 user: {
                     id: user.id,
                     email: user.email,
-                    username: user.username,
-                    full_name: user.full_name,
-                    user_type: user.user_type,
-                    is_admin: user.is_admin,
-                    trading_enabled: user.trading_enabled,
+                username: user.username,
+                full_name: user.full_name,
+                role: user.role,
+                is_admin: user.role === 'admin',
                     two_factor_enabled: user.two_factor_enabled
                 }
             });
@@ -215,7 +229,7 @@ class AuthRoutes {
                 });
             }
 
-            const { email, password, username, full_name, user_type = 'USER', referralCode } = req.body;
+            const { email, password, username, full_name, role = 'user', referralCode } = req.body;
 
             // Verificar se usuário já existe
             const existingUser = await this.dbPoolManager.executeRead(
@@ -249,14 +263,12 @@ class AuthRoutes {
             // Criar usuário - usando apenas campos obrigatórios e deixando defaults funcionarem
             const newUser = await this.dbPoolManager.executeWrite(`
                 INSERT INTO users (
-                    email, username, full_name, user_type, password_hash,
-                    is_admin, trading_enabled
+                    email, username, full_name, role, password_hash, trading_enabled
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7
+                    $1, $2, $3, $4, $5, $6
                 ) RETURNING *
             `, [
-                email, username, full_name, user_type, passwordHash,
-                user_type === 'ADMIN', true
+                email, username, full_name, role, passwordHash, true
             ]);
 
             const user = newUser.rows[0];
@@ -279,11 +291,10 @@ class AuthRoutes {
                 user: {
                     id: user.id,
                     email: user.email,
-                    username: user.username,
-                    full_name: user.full_name,
-                    user_type: user.user_type,
-                    is_admin: user.is_admin,
-                    trading_enabled: user.trading_enabled,
+                username: user.username,
+                full_name: user.full_name,
+                role: user.role,
+                is_admin: user.role === 'admin',
                     two_factor_enabled: user.two_factor_enabled
                 }
             });
@@ -316,7 +327,7 @@ class AuthRoutes {
 
             // Buscar usuário
             const userResult = await this.dbPoolManager.executeRead(
-                'SELECT * FROM users WHERE id = $1 AND is_active = true',
+                'SELECT * FROM users WHERE id = $1',
                 [userId]
             );
 
@@ -391,7 +402,7 @@ class AuthRoutes {
             
             // Verificar se usuário ainda existe e está ativo
             const userResult = await this.dbPoolManager.executeRead(
-                'SELECT id, email, username, user_type, is_admin FROM users WHERE id = $1 AND is_active = true',
+                'SELECT id, email, username, role FROM users WHERE id = $1',
                 [decoded.userId]
             );
 
@@ -426,8 +437,8 @@ class AuthRoutes {
         const payload = {
             userId: user.id,
             email: user.email,
-            userType: user.user_type,
-            isAdmin: user.is_admin,
+            role: user.role,
+            isAdmin: user.role === 'admin',
             timestamp: Date.now()
         };
 
@@ -481,15 +492,15 @@ class AuthRoutes {
             const userResult = await this.dbPoolManager.executeRead(
                 `SELECT
                     id, uuid, email, username, full_name, phone, country, language,
-                    user_type, is_admin, is_active, two_factor_enabled,
+                    role, two_factor_enabled,
                     balance_real_brl, balance_real_usd, balance_admin_brl,
                     balance_admin_usd, balance_commission_brl, balance_commission_usd,
                     plan_type, subscription_status, subscription_start_date, subscription_end_date,
                     affiliate_type, affiliate_code, affiliate_id,
-                    trading_enabled, max_open_positions, max_position_size,
+                    max_open_positions, max_position_size,
                     default_leverage, risk_level,
                     created_at, last_login_at, last_activity_at
-                FROM users WHERE id = $1 AND is_active = true`,
+                FROM users WHERE id = $1`,
                 [decoded.userId]
             );
 
@@ -514,8 +525,8 @@ class AuthRoutes {
                     phone: user.phone,
                     country: user.country,
                     language: user.language,
-                    user_type: user.user_type,
-                    is_admin: user.is_admin,
+                    role: user.role,
+                    is_admin: user.role === 'admin',
                     two_factor_enabled: user.two_factor_enabled,
                     balances: {
                         real_brl: parseFloat(user.balance_real_brl || 0),

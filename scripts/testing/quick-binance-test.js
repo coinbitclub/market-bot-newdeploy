@@ -44,7 +44,7 @@ async function quickTest() {
         
         // Test 2: Authenticated endpoint
         console.log('Test 2: Fetching account info (authenticated endpoint)...');
-        const accountInfo = await binance.getAccountInfo();
+        const accountInfo = await binance.getAccountBalance();
         console.log('✓ Success! API Key authenticated correctly!');
         console.log('\nAccount Details:');
         console.log('- Can Trade:', accountInfo.canTrade);
@@ -91,4 +91,5 @@ async function quickTest() {
 }
 
 quickTest();
+
 

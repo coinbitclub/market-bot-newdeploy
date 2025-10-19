@@ -14,9 +14,8 @@ class UnifiedExchangeService {
      */
     constructor(credentials = null) {
         // Initialize services with user credentials if provided
-        this.bybitService = new BybitService(credentials?.bybit || null);
-        this.binanceService = new BinanceService(credentials?.binance || null);
-        this.primaryExchange = 'bybit'; // Default to Bybit
+        this.bybitService = credentials?.bybit && credentials.bybit.apiKey && credentials.bybit.apiSecret ? new BybitService(credentials?.bybit) : new BybitService();
+        this.binanceService = credentials?.binance && credentials.binance.apiKey && credentials.binance.apiSecret ? new BinanceService(credentials?.binance) : new BinanceService();
         
         const credType = credentials ? 'USER CREDENTIALS' : 'ENV CREDENTIALS';
         console.log(`🔄 Unified Exchange Service initialized - ${credType}`);
@@ -76,26 +75,67 @@ class UnifiedExchangeService {
     }
 
     /**
-     * Get account information
+     * Get account information from both exchanges
      */
-    async getAccountInfo() {
+    async getAccountBalancence() {
         try {
-            // Try primary exchange first
-            if (this.primaryExchange === 'bybit') {
-                const result = await this.bybitService.getAccountInfo();
-                if (result.success) {
-                    return result;
-                }
+            const result = {
+                success: true,
+                bybit: null,
+                binance: null,
+                timestamp: new Date().toISOString()
+            };
+
+            // Get Bybit account info
+            try {
+                const bybitInfo = await this.bybitService.getAccountBalance();
+                result.bybit = {
+                    success: bybitInfo.success,
+                    data: bybitInfo.success ? bybitInfo.data : null,
+                    error: bybitInfo.success ? null : bybitInfo.error,
+                    hasCredentials: this.bybitService.hasCredentials
+                };
+            } catch (error) {
+                console.warn('⚠️ Bybit account info failed:', error.message);
+                result.bybit = {
+                    success: false,
+                    data: null,
+                    error: error.message,
+                    hasCredentials: this.bybitService.hasCredentials
+                };
             }
 
-            // Fallback to Binance
-            const result = await this.binanceService.getAccountInfo();
+            // Get Binance account info
+            try {
+                const binanceInfo = await this.binanceService.getAccountBalance();
+                result.binance = {
+                    success: binanceInfo.success,
+                    data: binanceInfo.success ? binanceInfo.result : null,
+                    error: binanceInfo.success ? null : binanceInfo.error,
+                    hasCredentials: this.binanceService.hasCredentials
+                };
+            } catch (error) {
+                console.warn('⚠️ Binance account info failed:', error.message);
+                result.binance = {
+                    success: false,
+                    data: null,
+                    error: error.message,
+                    hasCredentials: this.binanceService.hasCredentials
+                };
+            }
+
+            // Overall success if at least one exchange succeeded
+            result.success = result.bybit?.success || result.binance?.success;
+
             return result;
         } catch (error) {
             console.error('❌ Account info error:', error);
             return {
                 success: false,
-                error: error.message
+                bybit: null,
+                binance: null,
+                error: error.message,
+                timestamp: new Date().toISOString()
             };
         }
     }
@@ -105,7 +145,7 @@ class UnifiedExchangeService {
      */
     async getTradingStatus() {
         try {
-            const accountInfo = await this.getAccountInfo();
+            const accountInfo = await this.getAccountBalance();
             const marketAnalysis = await this.getMarketAnalysis(['BTCUSDT']);
 
             return {

@@ -195,7 +195,7 @@ class BybitService {
     /**
      * Get account information
      */
-    async getAccountInfo() {
+    async getAccountBalance() {
         try {
             const data = await this.makeAuthenticatedRequest('/v5/account/wallet-balance', {
                 accountType: 'UNIFIED'

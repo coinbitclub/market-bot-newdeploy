@@ -85,7 +85,7 @@ async function debugBinance() {
             isTestnet: keyData.environment === 'testnet'
         });
 
-        const balance = await service.getAccountInfo();
+        const balance = await service.getAccountBalance();
         
         if (balance && balance.success) {
             console.log('   SUCCESS! Binance API call worked!\n');

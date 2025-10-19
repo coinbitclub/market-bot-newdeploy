@@ -71,9 +71,9 @@ class PriorityQueueManager extends EventEmitter {
         // Determine priority based on operation type
         if (operation.type === 'emergency') {
             basePriority = this.PRIORITY_LEVELS.CRITICAL;
-        } else if (operation.type === 'management_trade' || operation.user_type === 'MANAGEMENT') {
+        } else if (operation.type === 'management_trade' || operation.user_role === 'admin') {
             basePriority = this.PRIORITY_LEVELS.HIGH;
-        } else if (operation.type === 'testnet_trade' || operation.user_type === 'TESTNET') {
+        } else if (operation.type === 'testnet_trade' || operation.user_role === 'user') {
             basePriority = this.PRIORITY_LEVELS.LOW;
         } else if (operation.type === 'multi_user_signal_processing') {
             basePriority = this.PRIORITY_LEVELS.HIGH; // Multi-user signals are high priority

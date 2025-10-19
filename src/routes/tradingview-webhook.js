@@ -188,18 +188,50 @@ class TradingViewWebhookRoutes {
      */
     async handleTradingViewSignal(req, res) {
         try {
-            const webhookData = req.body;
+            // Parse incoming data - TradingView can send as JSON, text, or URL-encoded
+            let webhookData = req.body;
             const headers = req.headers;
+            const contentType = headers['content-type'] || '';
 
             console.log('📊 TradingView webhook received:', {
-                // body: webhookData,
-                // headers: {
-                //     'user-agent': headers['user-agent'],
-                //     'content-type': headers['content-type'],
-                //     'content-length': headers['content-length']
-                // }
-                req: req.body
+                contentType,
+                bodyType: typeof req.body,
+                rawBody: req.body
             });
+
+            // Handle different data formats from TradingView
+            if (typeof webhookData === 'string') {
+                // Case 1: Plain text/JSON string - parse it
+                try {
+                    webhookData = JSON.parse(webhookData);
+                    console.log('✅ Parsed JSON string to object');
+                } catch (parseError) {
+                    console.error('❌ Failed to parse webhook string as JSON:', parseError.message);
+                    console.error('❌ Received plain text (not JSON). Please configure TradingView alert to send JSON format.');
+                    console.error('📋 Example JSON format for TradingView alert message:');
+                    console.error('   {"action":"{{strategy.order.action}}","symbol":"{{ticker}}","price":{{close}}}');
+                    
+                    return res.status(400).json({
+                        success: false,
+                        error: 'TradingView alert must send JSON format, not plain text',
+                        receivedType: typeof req.body,
+                        receivedData: req.body.substring(0, 200) + '...',
+                        help: 'Configure your TradingView alert message to use JSON format',
+                        example: '{"action":"{{strategy.order.action}}","symbol":"{{ticker}}","price":{{close}},"contracts":{{strategy.order.contracts}}}',
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            } else if (webhookData && typeof webhookData === 'object' && webhookData.text) {
+                // Case 2: URL-encoded form data with 'text' field containing JSON
+                try {
+                    webhookData = JSON.parse(webhookData.text);
+                    console.log('✅ Parsed JSON from text field');
+                } catch (parseError) {
+                    console.error('❌ Failed to parse text field as JSON:', parseError.message);
+                }
+            }
+
+            console.log('📊 Parsed webhook data:', webhookData);
 
             // Validate webhook data
             const validationResult = this.validateTradingViewSignal(webhookData);
@@ -231,11 +263,10 @@ class TradingViewWebhookRoutes {
                 console.error('Error saving signal to database:', err)
             );
 
-            // ✅ STEP 3: ASYNC Execute trades (don't block response)
-            let tradeExecutionPromise = null;
+            // ✅ STEP 3: ASYNC Execute trades (don't block response)            
             if (this.personalTradingEngine) {
                 console.log('🔑 Starting trade execution (async)...');
-                tradeExecutionPromise = this.personalTradingEngine.processSignalForAllUsers(signal)
+                const tradeExecutionPromise = this.personalTradingEngine.processSignalForAllUsers(signal)
                     .catch(err => {
                         console.error('Error executing trades:', err);
                         return { success: false, error: err.message };
@@ -349,11 +380,12 @@ class TradingViewWebhookRoutes {
      */
     validateTradingViewSignal(webhookData) {
         const errors = [];
+        const warnings = [];
 
         // Check if data exists
         if (!webhookData || typeof webhookData !== 'object') {
             errors.push('Webhook body must be a valid JSON object');
-            return { valid: false, errors };
+            return { valid: false, errors, warnings };
         }
 
         // Required fields validation
@@ -365,13 +397,18 @@ class TradingViewWebhookRoutes {
         }
 
         // Validate action
-        if (webhookData.action && !['buy', 'sell', 'BUY', 'SELL'].includes(webhookData.action)) {
-            errors.push('Action must be "buy", "sell", "BUY", or "SELL"');
+        if (webhookData.action) {
+            // Check for placeholder text
+            if (webhookData.action.includes('/') || webhookData.action.includes('{{')) {
+                errors.push(`Action contains placeholder text: "${webhookData.action}". Use TradingView variable: {{strategy.order.action}}`);
+            } else if (!['buy', 'sell', 'BUY', 'SELL', 'long', 'short', 'LONG', 'SHORT'].includes(webhookData.action.toLowerCase())) {
+                errors.push(`Invalid action: "${webhookData.action}". Must be: buy, sell, long, or short`);
+            }
         }
 
         // Validate symbol format (should be like BTCUSDT, ETHUSDT, etc.)
-        if (webhookData.symbol && !/^[A-Z]{3,10}USDT?$/i.test(webhookData.symbol)) {
-            console.log('⚠️ Unusual symbol format:', webhookData.symbol, '- proceeding anyway');
+        if (webhookData.symbol && !/^[A-Z]{2,10}USDT?(\.P)?$/i.test(webhookData.symbol)) {
+            warnings.push(`Unusual symbol format: "${webhookData.symbol}" - proceeding anyway`);
         }
 
         // Validate price if provided
@@ -379,9 +416,39 @@ class TradingViewWebhookRoutes {
             errors.push('Price must be a positive number');
         }
 
+        // Validate operation if provided (custom field)
+        if (webhookData.operation) {
+            const validOperations = ['OPEN_POSITION', 'CLOSE_POSITION', 'CLOSE_POSITION_EMA21'];
+            if (webhookData.operation.includes('/') || webhookData.operation.includes('{{')) {
+                errors.push(`Operation contains placeholder text: "${webhookData.operation}". Use one of: ${validOperations.join(', ')}`);
+            } else if (!validOperations.includes(webhookData.operation)) {
+                warnings.push(`Unusual operation: "${webhookData.operation}". Expected: ${validOperations.join(', ')}`);
+            }
+        }
+
+        // Validate side if provided
+        if (webhookData.side) {
+            if (webhookData.side.includes('/') || webhookData.side.includes('{{')) {
+                errors.push(`Side contains placeholder text: "${webhookData.side}". Use TradingView variable: {{strategy.order.action}}`);
+            } else if (!['Buy', 'Sell', 'buy', 'sell', 'BUY', 'SELL'].includes(webhookData.side)) {
+                warnings.push(`Unusual side value: "${webhookData.side}"`);
+            }
+        }
+
+        // Validate exchange if provided (optional field)
+        if (webhookData.exchange && webhookData.exchange.includes('/')) {
+            errors.push(`Exchange contains placeholder text: "${webhookData.exchange}". Use: BYBIT or BINANCE`);
+        }
+
+        // Log warnings
+        if (warnings.length > 0) {
+            console.log('⚠️ Validation warnings:', warnings);
+        }
+
         return {
             valid: errors.length === 0,
-            errors
+            errors,
+            warnings
         };
     }
 
@@ -395,7 +462,9 @@ class TradingViewWebhookRoutes {
             symbol: (webhookData.symbol || 'BTCUSDT').toUpperCase(),
             action: (webhookData.action || 'BUY').toUpperCase(),
             price: webhookData.price ? parseFloat(webhookData.price) : undefined,
-            quantity: webhookData.quantity ? parseFloat(webhookData.quantity) : undefined,
+            quantity: webhookData.quantity ? parseFloat(webhookData.quantity) : (webhookData.qty ? parseFloat(webhookData.qty) : undefined),
+            // Preserve original qty key for engines that look for it
+            qty: webhookData.qty ? parseFloat(webhookData.qty) : (webhookData.quantity ? parseFloat(webhookData.quantity) : undefined),
             timestamp: webhookData.timestamp || new Date().toISOString(),
             source: 'TradingView',
             strategy: webhookData.strategy || webhookData.alert_name || 'TradingView Signal',
@@ -404,6 +473,7 @@ class TradingViewWebhookRoutes {
             alert_name: webhookData.alert_name,
             interval: webhookData.interval || webhookData.timeframe,
             exchange: webhookData.exchange,
+            operation: webhookData.operation,
 
             // Risk management fields
             stop_loss: webhookData.stop_loss ? parseFloat(webhookData.stop_loss) : undefined,
@@ -471,7 +541,8 @@ class TradingViewWebhookRoutes {
                 supported_actions: ['BUY', 'SELL', 'buy', 'sell'],
                 supported_symbols: ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'MATICUSDT', 'DOTUSDT'],
                 required_fields: ['action', 'symbol'],
-                optional_fields: ['price', 'quantity', 'stop_loss', 'take_profit', 'strategy', 'alert_name'],
+                optional_fields: ['price', 'quantity', 'qty', 'stop_loss', 'take_profit', 'strategy', 'alert_name', 'exchange', 'operation', 'timestamp'],
+                note: 'Exchange field is optional - if not provided, system will use user\'s active exchanges',
                 endpoints: {
                     webhook: '/api/tradingview/signal',
                     alternative: '/api/tradingview/webhook',
@@ -485,6 +556,12 @@ class TradingViewWebhookRoutes {
                     strategy: 'My Strategy',
                     stop_loss: 48000,
                     take_profit: 55000
+                },
+                dynamic_exchange_example: {
+                    action: 'BUY',
+                    symbol: 'BTCUSDT',
+                    price: 50000,
+                    strategy: 'My Strategy'
                 }
             };
 

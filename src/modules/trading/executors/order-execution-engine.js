@@ -10,9 +10,6 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { Pool } = require('pg');
 
-console.log('🚀 ORDER EXECUTION ENGINE ENTERPRISE');
-console.log('====================================');
-
 // Configuração do banco
 const pool = new Pool({
     host: process.env.DB_HOST || 'junction.proxy.rlwy.net',
@@ -35,7 +32,6 @@ class OrderExecutionEngine {
             minBalance: 50 // USD
         };
         
-        console.log('🏭 Inicializando Order Execution Engine...');
     }
 
     /**
@@ -43,7 +39,6 @@ class OrderExecutionEngine {
      */
     async inicializar() {
         try {
-            console.log('\n🔧 1. INICIALIZANDO SISTEMA...');
             
             // Carregar usuários ativos
             await this.carregarUsuariosAtivos();
@@ -57,10 +52,8 @@ class OrderExecutionEngine {
             // Iniciar monitoramento
             this.iniciarMonitoramento();
             
-            console.log('✅ Sistema inicializado com sucesso!');
             
         } catch (error) {
-            console.error('❌ Erro na inicialização:', error.message);
             throw error;
         }
     }
@@ -70,7 +63,6 @@ class OrderExecutionEngine {
      */
     async carregarUsuariosAtivos() {
         try {
-            console.log('   📋 Carregando usuários ativos...');
             
             const result = await pool.query(`
                 SELECT DISTINCT u.id, u.username, u.country, u.plan_type,
@@ -84,7 +76,6 @@ class OrderExecutionEngine {
             `);
 
             if (result.rows.length === 0) {
-                console.log('   ⚠️ Nenhum usuário ativo encontrado');
                 return;
             }
 
@@ -117,10 +108,8 @@ class OrderExecutionEngine {
             });
 
             this.activeUsers = usuariosMap;
-            console.log(`   ✅ ${this.activeUsers.size} usuários carregados`);
             
         } catch (error) {
-            console.error('   ❌ Erro ao carregar usuários:', error.message);
             throw error;
         }
     }
@@ -130,7 +119,6 @@ class OrderExecutionEngine {
      */
     async validarConexoesExchange() {
         try {
-            console.log('   🔌 Validando conexões exchanges...');
             
             let totalConexoes = 0;
             let conexoesOk = 0;
@@ -165,7 +153,6 @@ class OrderExecutionEngine {
                 }
             }
 
-            console.log(`   ✅ ${conexoesOk}/${totalConexoes} conexões válidas`);
             
         } catch (error) {
             console.error('   ❌ Erro na validação:', error.message);
@@ -654,7 +641,7 @@ class OrderExecutionEngine {
                     'X-BAPI-SIGN-TYPE': '2',
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(params);
+                body: JSON.stringify(params),
             });
 
             const data = await response.data;
@@ -962,29 +949,9 @@ async function main() {
         const engine = new OrderExecutionEngine();
         await engine.inicializar();
         
-        console.log('\n📊 ESTATÍSTICAS DO SISTEMA:');
         const stats = await engine.obterEstatisticas();
-        console.log('================================');
-        console.log(`👥 Usuários ativos: ${stats.usuarios_ativos}`);
-        console.log(`🔌 Conexões ativas: ${stats.conexoes_ativas}`);
-        console.log(`💰 Saldo total: $${stats.saldo_total.toFixed(2)}`);
-        console.log(`📈 Posições ativas: ${stats.posicoes_ativas}`);
-        console.log(`📋 Ordens hoje: ${stats.ordens_hoje}`);
-
-        console.log('\n🎉 ORDER EXECUTION ENGINE OPERACIONAL!');
-        console.log('======================================');
-        console.log('');
-        console.log('✅ Sistema multiusuário enterprise ativo');
-        console.log('✅ Failover automático implementado');
-        console.log('✅ Risk management integrado');
-        console.log('✅ Monitoramento em tempo real');
-        console.log('✅ Suporte Binance + Bybit unified');
-        console.log('');
-        console.log('🚀 PRONTO PARA TRADING AUTOMÁTICO!');
-
         // Manter o processo ativo
         process.on('SIGINT', () => {
-            console.log('\n👋 Encerrando Order Execution Engine...');
             pool.end();
             process.exit(0);
         });
@@ -992,7 +959,6 @@ async function main() {
         return engine;
 
     } catch (error) {
-        console.error('❌ Falha na inicialização:', error.message);
         process.exit(1);
     }
 }

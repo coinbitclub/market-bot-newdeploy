@@ -33,6 +33,9 @@ class UserAPIKeysRoutes {
         // Set trading mode
         this.router.post('/trading-mode', this.setTradingMode.bind(this));
 
+        // Toggle exchange trading
+        this.router.post('/toggle-trading', this.toggleExchangeTrading.bind(this));
+
         // Get API key status for an exchange
         this.router.get('/:exchange/status', this.getAPIKeyStatus.bind(this));
 
@@ -286,6 +289,69 @@ class UserAPIKeysRoutes {
             res.status(500).json({
                 success: false,
                 error: 'Failed to set trading mode'
+            });
+        }
+    }
+
+    /**
+     * POST /toggle-trading
+     * Toggle exchange trading enabled/disabled
+     */
+    async toggleExchangeTrading(req, res) {
+        try {
+            const { exchange, trading_enabled } = req.body;
+            const userId = req.user?.id;
+
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Authentication required'
+                });
+            }
+
+            if (!exchange || typeof trading_enabled !== 'boolean') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Exchange and trading_enabled (boolean) are required'
+                });
+            }
+
+            if (!['bybit', 'binance'].includes(exchange.toLowerCase())) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid exchange. Must be bybit or binance'
+                });
+            }
+
+            // Update trading_enabled flag in user_api_keys table
+            const result = await this.apiKeyManager.dbPoolManager.executeWrite(`
+                UPDATE user_api_keys 
+                SET trading_enabled = $1, updated_at = NOW()
+                WHERE user_id = $2 AND exchange = $3
+                RETURNING id, exchange, trading_enabled
+            `, [trading_enabled, userId, exchange.toLowerCase()]);
+
+            if (result.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: `No API key found for ${exchange}`
+                });
+            }
+
+            console.log(`✅ Exchange ${exchange} trading ${trading_enabled ? 'enabled' : 'disabled'} for user ${userId}`);
+
+            res.json({
+                success: true,
+                message: `Exchange ${exchange} trading ${trading_enabled ? 'enabled' : 'disabled'}`,
+                exchange: exchange.toLowerCase(),
+                trading_enabled
+            });
+
+        } catch (error) {
+            console.error('❌ Error toggling exchange trading:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to toggle exchange trading'
             });
         }
     }

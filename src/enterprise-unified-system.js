@@ -4,8 +4,6 @@
 require('dotenv').config();
 
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
 const http = require('http');
 const morgan = require('morgan');
 
@@ -32,18 +30,12 @@ class CoinBitClubEnterpriseSystem {
         // Set database pool manager for auth routes
         setDbPoolManager(this.dbPoolManager);
 
-        console.log('🔧 Configurando middleware...');
         this.setupMiddleware();
-        console.log('🔧 Configurando rotas...');
         this.setupRoutes();
-        console.log('🔧 Configurando error handling...');
         this.setupErrorHandling();
-        console.log('🔧 Configurando WebSocket...');
         this.setupWebSocket();
-        console.log('🔧 Configurando process error handlers...');
         this.setupProcessErrorHandlers();
-
-        console.log('🏗️ CoinBitClub Enterprise System iniciado');
+        console.log('🏗️ CoinBitClub Enterprise System started');
     }
 
     setupMiddleware() {
@@ -62,9 +54,27 @@ class CoinBitClubEnterpriseSystem {
 
         // Global rate limiting (general API)
         this.app.use(this.security.getRateLimiter('general'));
+        
+        // TradingView webhook - Custom middleware to handle multiple content types
+        this.app.use('/api/tradingview', (req, res, next) => {
+            const contentType = req.headers['content-type'] || '';
+            
+            if (contentType.includes('application/json')) {
+                express.json()(req, res, next);
+            } else if (contentType.includes('text/plain')) {
+                express.text({ type: 'text/plain' })(req, res, next);
+            } else if (contentType.includes('application/x-www-form-urlencoded')) {
+                express.urlencoded({ extended: true })(req, res, next);
+            } else {
+                // Default to JSON
+                express.json()(req, res, next);
+            }
+        });
 
         // Skip JSON parsing for Stripe webhook to preserve raw body for signature verification
         this.app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+        
+        // Global body parsers (for all other routes)
         this.app.use(express.json({ limit: '10mb' }));
         this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -110,9 +120,7 @@ class CoinBitClubEnterpriseSystem {
         });
 
         // ⚡ API Routes
-        console.log('⚡ Setting up API routes...');
         this.app.use('/api', ApiRoutes);
-        console.log('✅ API routes configured');
     }
 
     setupErrorHandling() {
@@ -159,31 +167,26 @@ class CoinBitClubEnterpriseSystem {
         });
     }
 
-    async gracefulShutdown(exitCode = 0) {
-        console.log('🛑 Graceful shutdown initiated...');
+    async gracefulShutdown(exitCode = 0) {        
 
         try {
             // Stop accepting new connections
             if (this.server) {
                 await new Promise((resolve) => {
                     this.server.close(resolve);
-                    console.log('✅ HTTP server closed');
                 });
             }
 
             // Close database connections
             if (this.dbPoolManager) {
                 await this.dbPoolManager.closeAll();
-                console.log('✅ Database connections closed');
             }
 
             // Close WebSocket connections
             if (tradingWebSocket && tradingWebSocket.io) {
                 tradingWebSocket.io.close();
-                console.log('✅ WebSocket server closed');
             }
 
-            console.log('✅ Graceful shutdown complete');
             process.exit(exitCode);
 
         } catch (error) {
@@ -200,7 +203,6 @@ class CoinBitClubEnterpriseSystem {
             // Store reference for access from routes
             this.app.set('websocket', tradingWebSocket);
 
-            console.log('📡 WebSocket server configured');
         } catch (error) {
             console.error('❌ Erro configurando WebSocket:', error.message);
         }
@@ -209,12 +211,6 @@ class CoinBitClubEnterpriseSystem {
     async start() {
         try {
             this.server = this.httpServer.listen(this.port, () => {
-                console.log(`🚀 CoinBitClub Enterprise rodando na porta ${this.port}`);
-                console.log(`📊 Dashboard: http://localhost:${this.port}/dashboard`);
-                console.log(`⚡ API: http://localhost:${this.port}/api`);
-                console.log(`🔄 Health: http://localhost:${this.port}/health`);
-                console.log(`📡 WebSocket: ws://localhost:${this.port}`);
-
                 this.dbPoolManager.startHealthChecks();
             });
 
@@ -228,7 +224,6 @@ class CoinBitClubEnterpriseSystem {
     async stop() {
         if (this.server) {
             this.server.close();
-            console.log('🛑 Sistema enterprise parado');
         }
     }
 }

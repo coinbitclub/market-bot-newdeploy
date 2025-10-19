@@ -61,20 +61,42 @@ class UserSettingsRoutes {
 
     /**
      * GET /trading - Get user trading settings
+     * NOTE: Now uses consolidated users + user_trading_config tables
      */
     async getTradingSettings(req, res) {
         try {
-            const result = await this.authMiddleware.dbPoolManager.executeRead(
-                'SELECT * FROM user_trading_settings WHERE user_id = $1',
-                [req.user.id]
-            );
+            // Get settings from users table and user_trading_config
+            const result = await this.authMiddleware.dbPoolManager.executeRead(`
+                SELECT 
+                    u.max_open_positions, u.default_leverage, u.risk_level, u.trading_mode,
+                    utc.position_size_percentage, utc.stop_loss_multiplier, utc.take_profit_multiplier,
+                    utc.daily_loss_limit_percentage, utc.auto_trade_enabled, 
+                    utc.auto_stop_loss, utc.auto_take_profit
+                FROM users u
+                LEFT JOIN user_trading_config utc ON u.id = utc.user_id
+                WHERE u.id = $1
+            `, [req.user.id]);
 
             if (result.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'User not found'
+                });
+            }
+
+            // If no trading config exists, create default
+            if (!result.rows[0].position_size_percentage) {
                 await this.createDefaultTradingSettings(req.user.id);
-                const defaultResult = await this.authMiddleware.dbPoolManager.executeRead(
-                    'SELECT * FROM user_trading_settings WHERE user_id = $1',
-                    [req.user.id]
-                );
+                const defaultResult = await this.authMiddleware.dbPoolManager.executeRead(`
+                    SELECT 
+                        u.max_open_positions, u.default_leverage, u.risk_level, u.trading_mode,
+                        utc.position_size_percentage, utc.stop_loss_multiplier, utc.take_profit_multiplier,
+                        utc.daily_loss_limit_percentage, utc.auto_trade_enabled,
+                        utc.auto_stop_loss, utc.auto_take_profit
+                    FROM users u
+                    LEFT JOIN user_trading_config utc ON u.id = utc.user_id
+                    WHERE u.id = $1
+                `, [req.user.id]);
                 return res.json({
                     success: true,
                     settings: defaultResult.rows[0]
@@ -99,7 +121,14 @@ class UserSettingsRoutes {
      */
     async updateTradingSettings(req, res) {
         try {
-            const {
+            // Ensure table exists and default row is present (safe to call; uses ON CONFLICT DO NOTHING)
+            try {
+                await this.createDefaultTradingSettings(req.user.id);
+            } catch (e) {
+                console.warn('⚠️ Could not ensure trading settings table/default row:', e.message);
+            }
+
+            let {
                 max_leverage,
                 take_profit_percentage,
                 stop_loss_percentage,
@@ -110,11 +139,17 @@ class UserSettingsRoutes {
                 max_open_positions,
                 default_leverage,
                 stop_loss_multiplier,
-                take_profit_multiplier
+                take_profit_multiplier,
+                margin_mode
             } = req.body;
 
+            // Convert risk_level to uppercase to match database constraint
+            if (risk_level) {
+                risk_level = risk_level.toUpperCase();
+            }
+
             // Validate trading settings
-            const validation = this.validateTradingSettings(req.body);
+            const validation = this.validateTradingSettings({ ...req.body, risk_level });
             if (!validation.valid) {
                 return res.status(400).json({
                     success: false,
@@ -127,8 +162,8 @@ class UserSettingsRoutes {
                     user_id, max_leverage, take_profit_percentage, stop_loss_percentage,
                     position_size_percentage, risk_level, auto_trade_enabled,
                     daily_loss_limit_percentage, max_open_positions, default_leverage,
-                    stop_loss_multiplier, take_profit_multiplier, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+                    stop_loss_multiplier, take_profit_multiplier, margin_mode, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, COALESCE($13, 'ISOLATED'), NOW())
                 ON CONFLICT (user_id) DO UPDATE SET
                     max_leverage = EXCLUDED.max_leverage,
                     take_profit_percentage = EXCLUDED.take_profit_percentage,
@@ -141,13 +176,14 @@ class UserSettingsRoutes {
                     default_leverage = EXCLUDED.default_leverage,
                     stop_loss_multiplier = EXCLUDED.stop_loss_multiplier,
                     take_profit_multiplier = EXCLUDED.take_profit_multiplier,
+                    margin_mode = COALESCE(EXCLUDED.margin_mode, user_trading_settings.margin_mode),
                     updated_at = NOW()
                 RETURNING *`,
                 [
                     req.user.id, max_leverage, take_profit_percentage, stop_loss_percentage,
                     position_size_percentage, risk_level, auto_trade_enabled,
                     daily_loss_limit_percentage, max_open_positions, default_leverage,
-                    stop_loss_multiplier, take_profit_multiplier
+                    stop_loss_multiplier, take_profit_multiplier, margin_mode
                 ]
             );
 
@@ -211,6 +247,7 @@ class UserSettingsRoutes {
 
     /**
      * PUT /notifications - Update user notification settings
+     * NOTE: In optimized database, notification settings are stored in users table
      */
     async updateNotificationSettings(req, res) {
         try {
@@ -224,26 +261,18 @@ class UserSettingsRoutes {
                 loss_threshold_percentage
             } = req.body;
 
+            // Update users table directly (notification settings are stored there)
             const result = await this.authMiddleware.dbPoolManager.executeWrite(
-                `INSERT INTO user_notification_settings (
-                    user_id, email_notifications, sms_notifications, push_notifications,
-                    trade_alerts, report_frequency, profit_threshold_percentage,
-                    loss_threshold_percentage, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-                ON CONFLICT (user_id) DO UPDATE SET
-                    email_notifications = EXCLUDED.email_notifications,
-                    sms_notifications = EXCLUDED.sms_notifications,
-                    push_notifications = EXCLUDED.push_notifications,
-                    trade_alerts = EXCLUDED.trade_alerts,
-                    report_frequency = EXCLUDED.report_frequency,
-                    profit_threshold_percentage = EXCLUDED.profit_threshold_percentage,
-                    loss_threshold_percentage = EXCLUDED.loss_threshold_percentage,
+                `UPDATE users SET
+                    email_notifications = COALESCE($1, email_notifications),
+                    push_notifications = COALESCE($2, push_notifications),
                     updated_at = NOW()
-                RETURNING *`,
+                WHERE id = $3
+                RETURNING id, email_notifications, push_notifications, login_notifications, updated_at`,
                 [
-                    req.user.id, email_notifications, sms_notifications, push_notifications,
-                    trade_alerts, report_frequency, profit_threshold_percentage,
-                    loss_threshold_percentage
+                    email_notifications,
+                    push_notifications,
+                    req.user.id
                 ]
             );
 
@@ -269,8 +298,7 @@ class UserSettingsRoutes {
             const result = await this.authMiddleware.dbPoolManager.executeRead(
                 `SELECT
                     id, uuid, username, email, full_name, phone, country, language,
-                    email_verified, phone_verified, two_factor_enabled,
-                    user_type, is_admin, is_active,
+                    two_factor_enabled, role,
                     bank_name, bank_account, bank_agency, bank_document, pix_key,
                     last_login_at, created_at, updated_at
                 FROM users WHERE id = $1`,
@@ -325,8 +353,7 @@ class UserSettingsRoutes {
                 WHERE id = $12
                 RETURNING
                     id, uuid, username, email, full_name, phone, country, language,
-                    email_verified, phone_verified, two_factor_enabled,
-                    user_type, is_admin, is_active,
+                    two_factor_enabled, role,
                     bank_name, bank_account, bank_agency, bank_document, pix_key,
                     last_login_at, created_at, updated_at`,
                 [full_name, email, phone, country, language, bank_document,
@@ -408,6 +435,7 @@ class UserSettingsRoutes {
 
     /**
      * PUT /banking - Update user banking settings
+     * NOTE: In optimized database, banking settings are stored in users table
      */
     async updateBankingSettings(req, res) {
         try {
@@ -424,27 +452,20 @@ class UserSettingsRoutes {
                 phone
             } = req.body;
 
+            // Update users table directly (banking settings are stored there)
             const result = await this.authMiddleware.dbPoolManager.executeWrite(
-                `INSERT INTO user_banking_settings (
-                    user_id, pix_key, pix_type, bank_name, bank_code, agency,
-                    account, account_type, account_holder_name, cpf, phone, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-                ON CONFLICT (user_id) DO UPDATE SET
-                    pix_key = EXCLUDED.pix_key,
-                    pix_type = EXCLUDED.pix_type,
-                    bank_name = EXCLUDED.bank_name,
-                    bank_code = EXCLUDED.bank_code,
-                    agency = EXCLUDED.agency,
-                    account = EXCLUDED.account,
-                    account_type = EXCLUDED.account_type,
-                    account_holder_name = EXCLUDED.account_holder_name,
-                    cpf = EXCLUDED.cpf,
-                    phone = EXCLUDED.phone,
+                `UPDATE users SET
+                    pix_key = COALESCE($1, pix_key),
+                    bank_name = COALESCE($2, bank_name),
+                    bank_agency = COALESCE($3, bank_agency),
+                    bank_account = COALESCE($4, bank_account),
+                    bank_document = COALESCE($5, bank_document),
+                    phone = COALESCE($6, phone),
                     updated_at = NOW()
-                RETURNING *`,
+                WHERE id = $7
+                RETURNING id, pix_key, bank_name, bank_agency, bank_account, bank_document, phone, updated_at`,
                 [
-                    req.user.id, pix_key, pix_type, bank_name, bank_code, agency,
-                    account, account_type, account_holder_name, cpf, phone
+                    pix_key, bank_name, agency, account, cpf, phone, req.user.id
                 ]
             );
 
@@ -551,8 +572,26 @@ class UserSettingsRoutes {
 
     /**
      * Helper method to sync API keys to users table for backward compatibility
+     * NOTE: In optimized database, API keys are stored ONLY in user_api_keys table
+     * This method is kept for backward compatibility but does nothing
      */
     async syncApiKeyToUsersTable(userId, exchange, api_key, api_secret, passphrase, environment) {
+        try {
+            // API keys are now stored exclusively in user_api_keys table
+            // No need to sync to users table anymore
+            console.log(`📝 API key sync skipped for ${exchange} (using user_api_keys table)`);
+            return true;
+        } catch (error) {
+            console.error('❌ Sync API key error:', error);
+            return false;
+        }
+    }
+
+    /**
+     * DEPRECATED - Old switch statement for users table sync
+     * Keeping for reference but not used anymore
+     */
+    async _oldSyncApiKeyToUsersTable_DEPRECATED(userId, exchange, api_key, api_secret, passphrase, environment) {
         try {
             const exchangeLower = exchange.toLowerCase();
             const isTestnet = environment === 'testnet';
@@ -943,10 +982,7 @@ class UserSettingsRoutes {
                 ).catch(() => ({ rows: [] })),
                 this.authMiddleware.dbPoolManager.executeRead(
                     `SELECT id, full_name, email, phone, country, language, bank_document,
-                     binance_api_key, binance_secret_key, binance_testnet,
-                     bybit_api_key, bybit_secret_key, bybit_testnet,
-                     okx_api_key, okx_secret_key, okx_passphrase,
-                     bitget_api_key, bitget_secret_key, bitget_passphrase
+                     bank_name, bank_account, bank_agency, pix_key
                      FROM users WHERE id = $1`,
                     [req.user.id]
                 ),
@@ -963,7 +999,7 @@ class UserSettingsRoutes {
                     [req.user.id]
                 ).catch(() => ({ rows: [] })),
                 this.authMiddleware.dbPoolManager.executeRead(
-                    'SELECT id, exchange, api_key, environment, is_active, last_connection, connection_status FROM user_api_keys WHERE user_id = $1',
+                    'SELECT id, exchange, api_key, environment, is_active, verified, trading_enabled, last_connection FROM user_api_keys WHERE user_id = $1',
                     [req.user.id]
                 ).catch(() => ({ rows: [] })),
                 this.authMiddleware.dbPoolManager.executeRead(
@@ -1032,28 +1068,46 @@ class UserSettingsRoutes {
                 api_secret: '***hidden***'
             }));
 
-            // Format API keys from users table for frontend compatibility
+            // Format API keys from user_api_keys table for frontend compatibility
             const userData = personalResult.rows[0] || {};
+            
+            // API keys are now in user_api_keys table, not users table
+            // Build API keys object from apiKeysResult
+            const apiKeysFromTable = {};
+            if (apiKeysResult.rows && apiKeysResult.rows.length > 0) {
+                apiKeysResult.rows.forEach(key => {
+                    const exchange = key.exchange.toLowerCase();
+                    apiKeysFromTable[`${exchange}_api_key`] = key.api_key ? key.api_key.substring(0, 8) + '...' : '';
+                    apiKeysFromTable[`${exchange}_secret_key`] = '***hidden***';
+                    apiKeysFromTable[`${exchange}_testnet`] = key.environment === 'testnet';
+                    apiKeysFromTable[`${exchange}_connected`] = key.is_active && key.verified;
+                    apiKeysFromTable[`${exchange}_trading_enabled`] = key.trading_enabled || false;
+                });
+            }
+            
             const apiKeysFromUsers = {
-                binance_api_key: userData.binance_api_key ? userData.binance_api_key.substring(0, 8) + '...' : '',
-                binance_secret_key: userData.binance_secret_key ? '***hidden***' : '',
-                binance_testnet: userData.binance_testnet || false,
-                binance_connected: !!(userData.binance_api_key && userData.binance_secret_key),
+                binance_api_key: apiKeysFromTable.binance_api_key || '',
+                binance_secret_key: apiKeysFromTable.binance_secret_key || '',
+                binance_testnet: apiKeysFromTable.binance_testnet || false,
+                binance_connected: apiKeysFromTable.binance_connected || false,
+                binance_trading_enabled: apiKeysFromTable.binance_trading_enabled || false,
 
-                bybit_api_key: userData.bybit_api_key ? userData.bybit_api_key.substring(0, 8) + '...' : '',
-                bybit_secret_key: userData.bybit_secret_key ? '***hidden***' : '',
-                bybit_testnet: userData.bybit_testnet || false,
-                bybit_connected: !!(userData.bybit_api_key && userData.bybit_secret_key),
+                bybit_api_key: apiKeysFromTable.bybit_api_key || '',
+                bybit_secret_key: apiKeysFromTable.bybit_secret_key || '',
+                bybit_testnet: apiKeysFromTable.bybit_testnet || false,
+                bybit_connected: apiKeysFromTable.bybit_connected || false,
+                bybit_trading_enabled: apiKeysFromTable.bybit_trading_enabled || false,
 
-                okx_api_key: userData.okx_api_key ? userData.okx_api_key.substring(0, 8) + '...' : '',
-                okx_secret_key: userData.okx_secret_key ? '***hidden***' : '',
-                okx_passphrase: userData.okx_passphrase ? '***hidden***' : '',
-                okx_connected: !!(userData.okx_api_key && userData.okx_secret_key),
+                // OKX and Bitget support can be added later via user_api_keys table
+                okx_api_key: apiKeysFromTable.okx_api_key || '',
+                okx_secret_key: apiKeysFromTable.okx_secret_key || '',
+                okx_passphrase: '',
+                okx_connected: apiKeysFromTable.okx_connected || false,
 
-                bitget_api_key: userData.bitget_api_key ? userData.bitget_api_key.substring(0, 8) + '...' : '',
-                bitget_secret_key: userData.bitget_secret_key ? '***hidden***' : '',
-                bitget_passphrase: userData.bitget_passphrase ? '***hidden***' : '',
-                bitget_connected: !!(userData.bitget_api_key && userData.bitget_secret_key)
+                bitget_api_key: apiKeysFromTable.bitget_api_key || '',
+                bitget_secret_key: apiKeysFromTable.bitget_secret_key || '',
+                bitget_passphrase: '',
+                bitget_connected: apiKeysFromTable.bitget_connected || false
             };
 
             res.json({
@@ -1223,6 +1277,7 @@ class UserSettingsRoutes {
                 default_leverage INTEGER DEFAULT 5,
                 stop_loss_multiplier DECIMAL(3,2) DEFAULT 2.00,
                 take_profit_multiplier DECIMAL(3,2) DEFAULT 3.00,
+                margin_mode VARCHAR(16) DEFAULT 'ISOLATED',
                 created_at TIMESTAMP DEFAULT NOW(),
                 updated_at TIMESTAMP DEFAULT NOW()
             )
@@ -1234,8 +1289,8 @@ class UserSettingsRoutes {
                 user_id, max_leverage, take_profit_percentage, stop_loss_percentage,
                 position_size_percentage, risk_level, auto_trade_enabled,
                 daily_loss_limit_percentage, max_open_positions, default_leverage,
-                stop_loss_multiplier, take_profit_multiplier
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                stop_loss_multiplier, take_profit_multiplier, margin_mode
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'ISOLATED')
             ON CONFLICT (user_id) DO NOTHING`,
             [userId, 5, 15.00, 10.00, 30, 'medium', true, 10, 2, 5, 2.00, 3.00]
         );
@@ -1473,7 +1528,6 @@ class UserSettingsRoutes {
                     uak.exchange,
                     uak.api_key,
                     uak.is_active,
-                    uak.enabled,
                     uak.verified,
                     uak.created_at,
                     u.preferred_exchange
@@ -1535,7 +1589,6 @@ class UserSettingsRoutes {
                 WHERE u.id = $1
                 AND uak.exchange = u.preferred_exchange
                 AND uak.is_active = TRUE
-                AND uak.enabled = TRUE
                 AND uak.verified = TRUE
             `, [userId]);
 
@@ -1578,7 +1631,7 @@ class UserSettingsRoutes {
                         apiKey: user.api_key,
                         apiSecret: decryptedSecret // Use decrypted secret
                     });
-                    const balance = await service.getAccountInfo();
+                    const balance = await service.getAccountBalance();
                     balanceData = this.parseBinanceBalance(balance);
                 } else {
                     throw new Error(`Unsupported exchange: ${exchange}`);
@@ -1626,14 +1679,22 @@ class UserSettingsRoutes {
                     uak.exchange,
                     uak.api_key,
                     uak.api_secret,
-                    uak.environment
+                    uak.environment,
+                    uak.is_active,
+                    uak.verified,
+                    uak.trading_enabled
                 FROM user_api_keys uak
                 WHERE uak.user_id = $1
                 AND uak.is_active = TRUE
-                AND uak.enabled = TRUE
                 AND uak.verified = TRUE
+                AND uak.trading_enabled = TRUE
                 ORDER BY uak.exchange
             `, [userId]);
+
+            console.log(`📊 Found ${apiKeysResult.rows.length} API keys for user ${userId}:`);
+            apiKeysResult.rows.forEach((key, i) => {
+                console.log(`   ${i+1}. ${key.exchange.toUpperCase()}: ${key.api_key.substring(0, 10)}... (${key.environment}) - active:${key.is_active}, verified:${key.verified}`);
+            });
 
             if (apiKeysResult.rows.length === 0) {
                 return res.json({
@@ -1673,6 +1734,8 @@ class UserSettingsRoutes {
                     console.log(`🔓 ${exchange}: Decrypted secret (${decryptedSecret.length} chars), Key: ${keyData.api_key.substring(0, 10)}...`);
 
                     if (exchange === 'binance') {
+                        console.log(`🔍 Processing Binance API key: ${keyData.api_key.substring(0, 10)}... (${keyData.environment})`);
+                        
                         const BinanceService = require('../services/exchange/binance-service');
                         const service = new BinanceService({
                             apiKey: keyData.api_key,
@@ -1680,9 +1743,23 @@ class UserSettingsRoutes {
                             isTestnet: keyData.environment === 'testnet'
                         });
 
-                        const balance = await service.getAccountInfo();
-                        console.log(`📊 Binance raw response:`, JSON.stringify(balance).substring(0, 200) + '...');
-                        const parsedBalance = this.parseBinanceBalance({ success: true, result: balance });
+                        const balance = await service.getAccountBalance();
+                        console.log(`📊 Binance raw response:`, JSON.stringify(balance).substring(0, 500) + '...');
+                        console.log(`📊 Binance result structure:`, {
+                            success: balance.success,
+                            hasResult: !!balance.result,
+                            resultKeys: balance.result ? Object.keys(balance.result) : [],
+                            hasBalances: !!(balance.result && balance.result.balances),
+                            balancesLength: balance.result && balance.result.balances ? balance.result.balances.length : 0
+                        });
+                        
+                        if (!balance.success) {
+                            console.error(`❌ Binance API error: ${balance.error}`);
+                            balances.binance = { error: balance.error, total_equity: 0 };
+                            return 0;
+                        }
+                        
+                        const parsedBalance = this.parseBinanceBalance(balance); // balance already has { success, result }
                         console.log(`💰 Binance parsed: equity=${parsedBalance.total_equity}, coins=${parsedBalance.coins.length}`);
                         balances.binance = {
                             ...parsedBalance,
@@ -1747,6 +1824,7 @@ class UserSettingsRoutes {
 
     /**
      * Helper: Parse Bybit balance response
+     * FUTURES TRADING ONLY - UNIFIED Trading Account (UTA)
      */
     parseBybitBalance(balance) {
         if (!balance || !balance.success) {
@@ -1759,26 +1837,62 @@ class UserSettingsRoutes {
         }
 
         const walletData = balance.result?.list?.[0] || {};
+        const accountType = walletData.accountType || 'UNIFIED';
+
+        // FUTURES ONLY - UNIFIED Trading Account for Futures/Linear trading
+        if (accountType !== 'UNIFIED') {
+            console.warn(`⚠️  Expected UNIFIED account type, got: ${accountType}. Futures trading required.`);
+            return {
+                total_equity: 0,
+                available_balance: 0,
+                in_orders: 0,
+                coins: [],
+                error: 'Futures trading required'
+            };
+        }
+
+        const totalEquity = parseFloat(walletData.totalEquity || 0);
+        const availableBalance = parseFloat(walletData.totalAvailableBalance || 0);
+        const walletBalance = parseFloat(walletData.totalWalletBalance || 0);
+        const marginBalance = parseFloat(walletData.totalMarginBalance || 0);
+        const inOrders = walletBalance - availableBalance; // This should be 0 if available = wallet
+
+        console.log(`   🔍 Bybit balance parsing:`, {
+            totalEquity,
+            availableBalance,
+            walletBalance,
+            marginBalance,
+            inOrders
+        });
 
         return {
-            total_equity: parseFloat(walletData.totalEquity || 0),
-            available_balance: parseFloat(walletData.totalAvailableBalance || 0),
-            wallet_balance: parseFloat(walletData.totalWalletBalance || 0),
-            margin_balance: parseFloat(walletData.totalMarginBalance || 0),
-            in_orders: parseFloat(walletData.totalWalletBalance || 0) - parseFloat(walletData.totalAvailableBalance || 0),
+            total_equity: totalEquity,
+            available_balance: availableBalance,
+            wallet_balance: walletBalance,
+            margin_balance: marginBalance,
+            in_orders: inOrders,
             coins: (walletData.coin || [])
                 .filter(c => parseFloat(c.walletBalance || 0) > 0)
-                .map(c => ({
-                    coin: c.coin,
-                    wallet_balance: parseFloat(c.walletBalance),
-                    available: parseFloat(c.availableToWithdraw),
-                    equity: parseFloat(c.equity)
-                }))
+                .map(c => {
+                    const walletBal = parseFloat(c.walletBalance || 0);
+                    const available = parseFloat(c.availableToWithdraw || 0);
+                    const equity = parseFloat(c.equity || 0);
+                    
+                    console.log(`   💰 ${c.coin}: wallet=${walletBal}, available=${available}, equity=${equity}`);
+                    
+                    return {
+                        coin: c.coin,
+                        wallet_balance: walletBal,
+                        available: available,
+                        equity: equity
+                    };
+                })
         };
     }
 
     /**
      * Helper: Parse Binance balance response
+     * FUTURES TRADING ONLY - No Spot support
      */
     parseBinanceBalance(balance) {
         if (!balance || !balance.success) {
@@ -1791,25 +1905,50 @@ class UserSettingsRoutes {
         }
 
         const accountData = balance.result || {};
-        const balances = accountData.balances || [];
+        const accountType = accountData.accountType || 'FUTURES';
+        
+        // FUTURES ONLY - No Spot fallback
+        if (accountType !== 'FUTURES') {
+            console.warn(`⚠️  Expected FUTURES account type, got: ${accountType}. Futures trading required.`);
+            return {
+                total_equity: 0,
+                available_balance: 0,
+                in_orders: 0,
+                coins: [],
+                error: 'Futures trading required'
+            };
+        }
 
+        const balances = accountData.balances || [];
+        
+        console.log(`   🔍 Binance balance parsing: ${balances.length} assets found`);
+        balances.forEach((b, i) => {
+            console.log(`   📊 Asset ${i}: ${b.asset} - total=${b.total} (type: ${typeof b.total}), free=${b.free} (type: ${typeof b.free})`);
+        });
+        
+        // Calculate totals from balances array (already normalized in binance-service.js)
         const totalEquity = balances.reduce((sum, b) => {
-            return sum + parseFloat(b.free || 0) + parseFloat(b.locked || 0);
+            const total = parseFloat(b.total || 0);
+            console.log(`   ➕ Adding ${b.asset}: ${total} to sum (was: ${sum})`);
+            return sum + total;
         }, 0);
 
         const availableBalance = balances.reduce((sum, b) => {
-            return sum + parseFloat(b.free || 0);
+            const free = parseFloat(b.free || 0);
+            return sum + free;
         }, 0);
+        
+        console.log(`   📈 Final totals: equity=${totalEquity}, available=${availableBalance}`);
 
         return {
             total_equity: totalEquity,
             available_balance: availableBalance,
             in_orders: totalEquity - availableBalance,
             coins: balances
-                .filter(b => parseFloat(b.free || 0) > 0 || parseFloat(b.locked || 0) > 0)
+                .filter(b => parseFloat(b.total || 0) > 0)
                 .map(b => ({
                     coin: b.asset,
-                    wallet_balance: parseFloat(b.free || 0) + parseFloat(b.locked || 0),
+                    wallet_balance: parseFloat(b.total || 0),
                     available: parseFloat(b.free || 0),
                     locked: parseFloat(b.locked || 0)
                 }))

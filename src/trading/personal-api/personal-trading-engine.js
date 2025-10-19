@@ -129,29 +129,28 @@ class PersonalTradingEngine {
 
     /**
      * Get users who have personal API keys configured and verified
-     * ADAPTED: Uses existing user_api_keys table structure
+     * UPDATED: Now supports dynamic exchange selection based on user preferences
      */
     async getUsersWithPersonalKeys(symbol) {
         try {
             console.log('🔍 DEBUG [getUsersWithPersonalKeys]: ENTERED method');
             console.log('🔍 DEBUG: Symbol parameter =', symbol);
 
-            // Get users with verified personal API keys (PERSONAL mode only - no admin keys)
-            // Uses per-user preferred_exchange setting
-            console.log('🔍 DEBUG: Querying users with their preferred exchange...');
+            // Get users with verified personal API keys and their trading preferences
+            console.log('🔍 DEBUG: Querying users with active trading exchanges...');
             const result = await this.dbPoolManager.executeRead(`
                 SELECT
                     u.id, u.username, u.plan_type, u.subscription_status,
                     u.balance_real_brl, u.balance_real_usd,
                     u.balance_admin_brl, u.balance_admin_usd,
                     u.max_open_positions, u.default_leverage, u.risk_level,
-                    u.trading_mode,
-                    u.preferred_exchange,
+                    u.trading_mode, u.preferred_exchange,
                     uak.exchange as configured_exchange,
                     uak.api_key,
                     uak.verified,
-                    uak.enabled,
                     uak.is_active,
+                    uak.trading_enabled,
+                    uak.trading_priority,
                     CASE
                         WHEN u.plan_type LIKE 'PRO%' THEN 1
                         WHEN u.plan_type LIKE 'FLEX%' THEN 2
@@ -161,14 +160,14 @@ class PersonalTradingEngine {
                 FROM users u
                 INNER JOIN user_api_keys uak ON u.id = uak.user_id
                 WHERE u.subscription_status = 'active'
+                AND u.trading_enabled = TRUE
                 AND (u.trading_mode = 'PERSONAL' OR u.trading_mode IS NULL)
-                AND uak.exchange = u.preferred_exchange
                 AND uak.is_active = TRUE
-                AND uak.enabled = TRUE
                 AND uak.verified = TRUE
+                AND uak.trading_enabled = TRUE
                 AND uak.api_key IS NOT NULL
                 AND uak.api_secret IS NOT NULL
-                ORDER BY plan_priority
+                ORDER BY plan_priority, uak.trading_priority
             `);
 
             console.log('🔍 DEBUG: Query executed successfully');
@@ -179,14 +178,40 @@ class PersonalTradingEngine {
                 console.log('🔍 DEBUG: NO ROWS RETURNED FROM QUERY');
             }
 
-            const mappedUsers = result.rows.map(user => ({
+            // Group users by user_id to handle multiple exchanges per user
+            const userMap = new Map();
+            
+            result.rows.forEach(row => {
+                const userId = row.id;
+                
+                if (!userMap.has(userId)) {
+                    userMap.set(userId, {
+                        ...row,
+                        operationalBalance: {
+                            brl: parseFloat(row.balance_real_brl || 0) + parseFloat(row.balance_admin_brl || 0),
+                            usd: parseFloat(row.balance_real_usd || 0) + parseFloat(row.balance_admin_usd || 0)
+                        },
+                        planConfig: this.PLAN_PRIORITIES[row.plan_type] || this.PLAN_PRIORITIES['TRIAL'],
+                        activeExchanges: []
+                    });
+                }
+                
+                // Add this exchange to user's active exchanges
+                const user = userMap.get(userId);
+                user.activeExchanges.push({
+                    exchange: row.configured_exchange,
+                    trading_enabled: row.trading_enabled,
+                    trading_priority: row.trading_priority,
+                    api_key: row.api_key
+                });
+            });
+
+            const mappedUsers = Array.from(userMap.values()).map(user => ({
                 ...user,
-                operationalBalance: {
-                    brl: parseFloat(user.balance_real_brl || 0) + parseFloat(user.balance_admin_brl || 0),
-                    usd: parseFloat(user.balance_real_usd || 0) + parseFloat(user.balance_admin_usd || 0)
-                },
-                planConfig: this.PLAN_PRIORITIES[user.plan_type] || this.PLAN_PRIORITIES['TRIAL'],
-                preferredExchange: user.preferred_exchange || user.configured_exchange || 'bybit'
+                // Use sensible defaults since user_trading_preferences table was removed
+                preferredExchanges: user.preferred_exchange ? [user.preferred_exchange] : ['bybit', 'binance'],
+                autoSelectExchange: true, // Always auto-select from active exchanges
+                maxSimultaneousExchanges: user.max_open_positions || 2
             }));
 
             console.log('🔍 DEBUG: Mapped users count =', mappedUsers.length);
@@ -269,96 +294,219 @@ class PersonalTradingEngine {
     }
 
     /**
-     * Execute trade using user's personal API key on both exchanges if connected
+     * Execute trade using user's personal API key with dynamic exchange selection
      */
     async executePersonalTrade(signal, aiDecision, user, planConfig) {
         try {
             console.log(`📈 Executing personal trade for user ${user.username} (${user.plan_type})`);
-
-            // Calculate position size based on user balance
-            const positionSize = this.calculatePositionSize(user, signal);
-
-            if (positionSize <= 0) {
-                return {
-                    userId: user.id,
-                    username: user.username,
-                    success: false,
-                    message: 'Insufficient balance for minimum position'
-                };
-            }
-
-            // Check which exchanges are connected
-            const connectedExchanges = await this.getConnectedExchanges(user.id);
             
-            if (connectedExchanges.length === 0) {
-                return {
-                    userId: user.id,
-                    username: user.username,
-                    success: false,
-                    message: 'No connected exchanges found'
-                };
-            }
-
-            console.log(`🔄 Trading on ${connectedExchanges.length} exchanges: ${connectedExchanges.join(', ')}`);
-
-            // Calculate quantity - use signal quantity if provided, otherwise calculate
-            const calculatedQty = signal.quantity || this.calculateQuantity(signal.symbol, positionSize, signal.price);
-
-            console.log(`📊 Trade calculation for ${user.username}:`, {
-                positionSize,
-                signalQuantity: signal.quantity,
-                calculatedQty,
-                symbol: signal.symbol,
-                price: signal.price,
-                exchanges: connectedExchanges
-            });
-
-            // Validate quantity
-            if (!calculatedQty || calculatedQty <= 0 || isNaN(calculatedQty)) {
-                return {
-                    userId: user.id,
-                    username: user.username,
-                    success: false,
-                    message: `Invalid quantity calculated: ${calculatedQty} (positionSize: $${positionSize})`
-                };
-            }
-
-            // Execute trades on all connected exchanges
-            const tradeResults = [];
+            // Determine target exchanges based on signal and user preferences
+            let targetExchanges = [];
             
-            for (const exchange of connectedExchanges) {
-                try {
-                    const result = await this.executeTradeOnExchange(signal, aiDecision, user, planConfig, exchange, calculatedQty, positionSize);
-                    tradeResults.push(result);
-                } catch (error) {
-                    console.error(`❌ Error executing trade on ${exchange} for ${user.username}:`, error);
-                    tradeResults.push({
+            if (signal.exchange) {
+                // Signal specifies exchange - use it if user has it enabled
+                const signalExchange = signal.exchange.toLowerCase();
+                console.log(`📍 Signal specifies exchange: ${signalExchange}`);
+                
+                const hasExchange = user.activeExchanges.find(ex => 
+                    ex.exchange === signalExchange && ex.trading_enabled
+                );
+                
+                if (hasExchange) {
+                    targetExchanges = [signalExchange];
+                    console.log(`✅ User has ${signalExchange} enabled, will trade on ${signalExchange}`);
+                } else {
+                    console.log(`⚠️ User doesn't have ${signalExchange} enabled - skipping trade`);
+                    return {
                         userId: user.id,
                         username: user.username,
-                        exchange,
                         success: false,
-                        message: `Failed on ${exchange}: ${error.message}`
+                        message: `Exchange ${signalExchange} is not enabled for trading`
+                    };
+                }
+            } else {
+                // No exchange specified in signal - use user's active exchanges
+                console.log(`📍 No exchange specified in signal - using user's active exchanges`);
+                
+                // Get user's active exchanges sorted by priority
+                const activeExchanges = user.activeExchanges
+                    .filter(ex => ex.trading_enabled)
+                    .sort((a, b) => a.trading_priority - b.trading_priority)
+                    .map(ex => ex.exchange);
+                
+                if (activeExchanges.length === 0) {
+                    console.log(`⚠️ No active exchanges for user ${user.username}`);
+                    return {
+                        userId: user.id,
+                        username: user.username,
+                        success: false,
+                        message: 'No active exchanges configured for trading'
+                    };
+                }
+                
+                // Limit to max simultaneous exchanges
+                const maxExchanges = Math.min(user.maxSimultaneousExchanges, activeExchanges.length);
+                targetExchanges = activeExchanges.slice(0, maxExchanges);
+                
+                console.log(`✅ User has ${activeExchanges.length} active exchanges, will trade on: ${targetExchanges.join(', ')}`);
+            }
+
+            // Check operation type
+            const operation = signal.operation || 'OPEN_POSITION';
+            console.log(`📋 Operation type: ${operation}`);
+
+            // Handle CLOSE_POSITION operation
+            if (operation === 'CLOSE_POSITION' || operation === 'CLOSE_POSITION_EMA21') {
+                console.log(`🔒 Processing CLOSE operation for ${signal.symbol} on ${targetExchanges.join(', ')}`);
+                return await this.handleClosePositionMultiple(signal, user, targetExchanges, operation);
+            }
+
+            // Handle OPEN_POSITION operation
+            // Check for existing open positions
+            const openPositions = await this.getOpenPositions(user.id);
+            console.log(`📊 User has ${openPositions.length} open positions`);
+
+            // Rule 1: Max 3 simultaneous positions
+            if (openPositions.length >= 3) {
+                console.log(`⚠️ User already has 3 open positions (max limit)`);
+                return {
+                    userId: user.id,
+                    username: user.username,
+                    success: false,
+                    message: 'Maximum 3 simultaneous positions allowed'
+                };
+            }
+
+            // Rule 2: No duplicate currency
+            const existingSymbols = openPositions.map(p => p.symbol);
+            if (existingSymbols.includes(signal.symbol)) {
+                console.log(`⚠️ User already has an open position for ${signal.symbol}`);
+                return {
+                    userId: user.id,
+                    username: user.username,
+                    success: false,
+                    message: `Already have an open position for ${signal.symbol}`
+                };
+            }
+
+            // Execute trades on all target exchanges
+            const results = [];
+            let totalFees = 0;
+            
+            for (const targetExchange of targetExchanges) {
+                try {
+                    console.log(`🔄 Processing trade on ${targetExchange}...`);
+                    
+                    // Get user's API credentials for this exchange
+                    const credentials = await this.apiKeyManager.getAPICredentials(user.id, targetExchange);
+                    if (!credentials.success || !credentials.isActive) {
+                        console.log(`⚠️ Missing or inactive API key for ${targetExchange} - skipping`);
+                        results.push({
+                            exchange: targetExchange,
+                            success: false,
+                            message: `API key for ${targetExchange} is not available or inactive`
+                        });
+                        continue;
+                    }
+
+                    // Get balance for this exchange
+                    console.log(`💰 Fetching balance for ${signal.symbol} from ${targetExchange}...`);
+                    const balanceInfo = await this.getRealExchangeBalance(targetExchange, credentials, signal.symbol);
+
+                    if (!balanceInfo || balanceInfo.balance <= 0) {
+                        console.log(`⚠️ No ${balanceInfo.token} balance on ${targetExchange}: ${balanceInfo.balance}`);
+                        results.push({
+                            exchange: targetExchange,
+                            success: false,
+                            message: `Insufficient ${balanceInfo.token} balance on ${targetExchange} (${balanceInfo.balance.toFixed(2)})`
+                        });
+                        continue;
+                    }
+
+                    // Use user's configured position size percentage (default 10%)
+                    const positionSizePercent = await this.getUserPositionSizePercentage(user.id);
+                    const positionSize = balanceInfo.balance * (positionSizePercent / 100);
+                    
+                    console.log(`💰 Balance calculation for ${targetExchange}:`, {
+                        exchange: targetExchange,
+                        symbol: signal.symbol,
+                        token: balanceInfo.token,
+                        tokenBalance: balanceInfo.balance.toFixed(2),
+                        positionSize: positionSize.toFixed(2),
+                        percentage: `${positionSizePercent}%`
+                    });
+
+                    if (positionSize < 10) {
+                        results.push({
+                            exchange: targetExchange,
+                            success: false,
+                            message: `Minimum position size $10 required (current ${balanceInfo.token}: ${positionSize.toFixed(2)})`
+                        });
+                        continue;
+                    }
+
+                    // Calculate quantity - use signal quantity if provided, otherwise calculate
+                    const calculatedQty = signal.qty || signal.quantity || this.calculateQuantity(signal.symbol, positionSize, signal.price);
+
+                    console.log(`📊 Trade calculation for ${user.username} on ${targetExchange}:`, {
+                        positionSize,
+                        signalQuantity: signal.quantity,
+                        calculatedQty,
+                        symbol: signal.symbol,
+                        price: signal.price,
+                        exchange: targetExchange
+                    });
+
+                    // Validate quantity
+                    if (!calculatedQty || calculatedQty <= 0 || isNaN(calculatedQty)) {
+                        results.push({
+                            exchange: targetExchange,
+                            success: false,
+                            message: `Invalid quantity calculated: ${calculatedQty} (positionSize: $${positionSize})`
+                        });
+                        continue;
+                    }
+
+                    // Execute trade on this exchange
+                    const result = await this.executeTradeOnExchange(
+                        signal, 
+                        aiDecision, 
+                        user, 
+                        planConfig, 
+                        targetExchange, 
+                        calculatedQty, 
+                        positionSize
+                    );
+                    
+                    results.push(result);
+                    
+                    // Add to total fees if successful
+                    if (result.success && result.fee) {
+                        totalFees += result.fee;
+                    }
+                    
+                } catch (error) {
+                    console.error(`❌ Error executing trade on ${targetExchange} for ${user.username}:`, error);
+                    results.push({
+                        exchange: targetExchange,
+                        success: false,
+                        message: `Failed on ${targetExchange}: ${error.message}`
                     });
                 }
             }
 
-            // Return combined result
-            const successfulTrades = tradeResults.filter(r => r.success);
-            const failedTrades = tradeResults.filter(r => !r.success);
-
+            // Return consolidated result
+            const successfulTrades = results.filter(r => r.success);
+            const failedTrades = results.filter(r => !r.success);
+            
             return {
                 userId: user.id,
                 username: user.username,
-                planType: user.plan_type,
-                positionSize,
-                commission: planConfig.commission,
-                symbol: signal.symbol,
-                side: aiDecision.action,
                 success: successfulTrades.length > 0,
-                message: `${successfulTrades.length}/${tradeResults.length} trades successful`,
-                exchanges: tradeResults,
-                successfulExchanges: successfulTrades.map(r => r.exchange),
-                failedExchanges: failedTrades.map(r => r.exchange),
+                message: `Executed ${successfulTrades.length}/${targetExchanges.length} trades successfully`,
+                exchanges: targetExchanges,
+                results: results,
+                totalFees: totalFees,
                 timestamp: new Date().toISOString(),
                 personalKey: true
             };
@@ -371,6 +519,464 @@ class PersonalTradingEngine {
                 success: false,
                 message: error.message,
                 personalKey: true
+            };
+        }
+    }
+
+    async getUserPositionSizePercentage(userId) {
+        try {
+            const result = await this.dbPoolManager.executeRead(
+                `SELECT position_size_percentage FROM users WHERE id = $1`,
+                [userId]
+            );
+            const pct = parseFloat(result.rows[0]?.position_size_percentage);
+            if (!isNaN(pct) && pct > 0) {
+                return pct;
+            }
+            return 10; // default 10%
+        } catch (e) {
+            return 10; // default on error
+        }
+    }
+
+    /**
+     * Get open positions for a user
+     */
+    async getOpenPositions(userId) {
+        try {
+            const result = await this.dbPoolManager.executeRead(`
+                SELECT 
+                    id,
+                    position_id,
+                    symbol,
+                    operation_type,
+                    side,
+                    entry_price,
+                    quantity,
+                    exchange,
+                    entry_time,
+                    amount as position_size
+                FROM trading_operations
+                WHERE user_id = $1
+                AND status = 'OPEN'
+                ORDER BY entry_time DESC
+            `, [userId]);
+
+            return result.rows || [];
+        } catch (error) {
+            console.error('❌ Error getting open positions:', error);
+            return [];
+        }
+    }
+
+    async getUserMarginMode(userId) {
+        try {
+            const result = await this.dbPoolManager.executeRead(
+                `SELECT 'ISOLATED' as margin_mode` // Default to ISOLATED since margin_mode column doesn't exist
+                [userId]
+            );
+            const mode = (result.rows[0]?.margin_mode || 'ISOLATED').toUpperCase();
+            return mode === 'CROSS' ? 'CROSS' : 'ISOLATED';
+        } catch (e) {
+            return 'ISOLATED';
+        }
+    }
+
+    /**
+     * Handle CLOSE_POSITION operation for multiple exchanges
+     */
+    async handleClosePositionMultiple(signal, user, targetExchanges, operation) {
+        try {
+            const results = [];
+            let totalPnl = 0;
+            let totalCommission = 0;
+            
+            for (const targetExchange of targetExchanges) {
+                try {
+                    console.log(`🔒 Processing CLOSE operation for ${signal.symbol} on ${targetExchange}...`);
+                    
+                    // Find open position for this symbol on this exchange
+                    const openPosition = await this.dbPoolManager.executeRead(`
+                        SELECT 
+                            id,
+                            position_id,
+                            symbol,
+                            operation_type,
+                            side,
+                            entry_price,
+                            quantity,
+                            exchange,
+                            entry_time,
+                            amount as position_size,
+                            exchange_order_id as order_id
+                        FROM trading_operations
+                        WHERE user_id = $1
+                        AND symbol = $2
+                        AND exchange = $3
+                        AND status = 'OPEN'
+                        LIMIT 1
+                    `, [user.id, signal.symbol, targetExchange]);
+
+                    if (openPosition.rows.length === 0) {
+                        console.log(`ℹ️ No open position found for ${signal.symbol} on ${targetExchange}`);
+                        results.push({
+                            exchange: targetExchange,
+                            success: false,
+                            message: `No open position found for ${signal.symbol} on ${targetExchange}`
+                        });
+                        continue;
+                    }
+
+                    const position = openPosition.rows[0];
+                    console.log(`📍 Found open position: ${position.operation_id} on ${targetExchange}`);
+
+                    // Get exchange service to close position
+                    const credentials = await this.apiKeyManager.getAPICredentials(user.id, targetExchange);
+                    const exchangeService = await this.createUserExchangeService(targetExchange, credentials);
+
+                    // Close the position
+                    const exitPrice = parseFloat(signal.price) || 0;
+                    const entryPrice = parseFloat(position.entry_price) || 0;
+                    const quantity = parseFloat(position.quantity) || 0;
+
+                    // Calculate P&L
+                    const isLong = position.operation_type === 'LONG';
+                    const pnlUsd = (exitPrice - entryPrice) * quantity * (isLong ? 1 : -1);
+                    const pnlPercent = ((exitPrice - entryPrice) / entryPrice) * 100 * (isLong ? 1 : -1);
+                    const isProfitable = pnlUsd > 0;
+
+                    console.log(`💰 P&L Calculation for ${targetExchange}:`, {
+                        entryPrice,
+                        exitPrice,
+                        quantity,
+                        pnlUsd: pnlUsd.toFixed(2),
+                        pnlPercent: pnlPercent.toFixed(2) + '%',
+                        isProfitable
+                    });
+
+                    // Calculate commission ONLY if profitable
+                    let commission = 0;
+                    let commissionPercent = 0;
+                    if (isProfitable) {
+                        const planConfig = this.PLAN_PRIORITIES[user.plan_type] || this.PLAN_PRIORITIES['TRIAL'];
+                        commissionPercent = planConfig.commission || 0;
+                        commission = (pnlUsd * commissionPercent) / 100;
+                        console.log(`💵 Commission for ${targetExchange}: ${commissionPercent}% of $${pnlUsd.toFixed(2)} = $${commission.toFixed(2)}`);
+                    } else {
+                        console.log(`ℹ️ No commission charged on losing trade for ${targetExchange}`);
+                    }
+
+                    const netPnl = pnlUsd - commission;
+                    totalPnl += pnlUsd;
+                    totalCommission += commission;
+
+                    // Close position in database
+                    const duration = Math.floor((Date.now() - new Date(position.entry_time).getTime()) / 60000);
+                    
+                    await this.dbPoolManager.executeWrite(`
+                        UPDATE trading_operations
+                        SET
+                            exit_price = $1,
+                            exit_time = NOW(),
+                            status = 'CLOSED',
+                            duration_minutes = $2,
+                            profit_loss_usd = $3,
+                            profit_loss_percentage = $4,
+                            net_pnl = $5,
+                            commission_charged = $6,
+                            close_reason = $7,
+                            updated_at = NOW()
+                        WHERE operation_id = $8
+                    `, [
+                        exitPrice,
+                        duration,
+                        pnlUsd,
+                        pnlPercent,
+                        netPnl,
+                        commission,
+                        operation, // 'CLOSE_POSITION' or 'CLOSE_POSITION_EMA21'
+                        position.operation_id
+                    ]);
+
+                    console.log(`✅ Position closed on ${targetExchange}: ${position.operation_id} - Net P&L: $${netPnl.toFixed(2)}`);
+
+                    // Update affiliate commission if profitable
+                    if (isProfitable && commission > 0) {
+                        try {
+                            console.log(`🤝 Calculating affiliate commission for user ${user.id} on ${targetExchange}...`);
+                            const affiliateCommission = await this.affiliateService.calculateTradingCommission(
+                                user.id, 
+                                commission // Commission amount goes to affiliate
+                            );
+                            
+                            if (affiliateCommission) {
+                                console.log(`💰 Affiliate commission: $${affiliateCommission.commission.toFixed(2)} for affiliate ${affiliateCommission.affiliateId}`);
+                                
+                                tradingWebSocket.broadcastAffiliateCommission(affiliateCommission.affiliateId, {
+                                    affiliateId: affiliateCommission.affiliateId,
+                                    amount: affiliateCommission.commission,
+                                    source: 'trading_profit',
+                                    description: `Profit commission from ${user.username} - ${signal.symbol} closed on ${targetExchange}`
+                                });
+                            }
+                        } catch (error) {
+                            console.error(`❌ Error calculating affiliate commission for ${targetExchange}:`, error);
+                        }
+                    }
+
+                    // Broadcast position closed
+                    tradingWebSocket.broadcastOperationClosed(user.id, {
+                        position_id: position.position_id || position.id,
+                        symbol: signal.symbol,
+                        entry_price: entryPrice,
+                        exit_price: exitPrice,
+                        profit_loss_usd: pnlUsd,
+                        profit_loss_percentage: pnlPercent,
+                        net_pnl: netPnl,
+                        commission: commission,
+                        duration_minutes: duration,
+                        close_reason: operation,
+                        exchange: targetExchange
+                    });
+
+                    results.push({
+                        exchange: targetExchange,
+                        success: true,
+                        operation: 'CLOSE_POSITION',
+                        positionClosed: true,
+                        symbol: signal.symbol,
+                        entryPrice,
+                        exitPrice,
+                        pnlUsd,
+                        pnlPercent,
+                        commission,
+                        netPnl,
+                        isProfitable,
+                        duration,
+                        message: `Position closed on ${targetExchange} - ${isProfitable ? 'Profit' : 'Loss'}: $${pnlUsd.toFixed(2)} (${pnlPercent.toFixed(2)}%)`
+                    });
+                    
+                } catch (error) {
+                    console.error(`❌ Error handling close position on ${targetExchange}:`, error);
+                    results.push({
+                        exchange: targetExchange,
+                        success: false,
+                        message: `Failed to close position on ${targetExchange}: ${error.message}`
+                    });
+                }
+            }
+
+            // Update user performance if any positions were closed
+            const successfulCloses = results.filter(r => r.success);
+            if (successfulCloses.length > 0) {
+                await this.updateUserPerformance(user.id);
+            }
+
+            return {
+                userId: user.id,
+                username: user.username,
+                success: successfulCloses.length > 0,
+                message: `Closed ${successfulCloses.length}/${targetExchanges.length} positions successfully`,
+                exchanges: targetExchanges,
+                results: results,
+                totalPnl: totalPnl,
+                totalCommission: totalCommission,
+                operation: 'CLOSE_POSITION',
+                timestamp: new Date().toISOString(),
+                personalKey: true
+            };
+
+        } catch (error) {
+            console.error(`❌ Error handling close position multiple:`, error);
+            return {
+                userId: user.id,
+                username: user.username,
+                success: false,
+                message: error.message,
+                operation: 'CLOSE_POSITION'
+            };
+        }
+    }
+
+    /**
+     * Handle CLOSE_POSITION operation (legacy method for single exchange)
+     */
+    async handleClosePosition(signal, user, targetExchange, operation) {
+        try {
+            // Find open position for this symbol
+            const openPosition = await this.dbPoolManager.executeRead(`
+                SELECT 
+                    id,
+                    position_id,
+                    symbol,
+                    operation_type,
+                    side,
+                    entry_price,
+                    quantity,
+                    exchange,
+                    entry_time,
+                    amount as position_size,
+                    exchange_order_id as order_id
+                FROM trading_operations
+                WHERE user_id = $1
+                AND symbol = $2
+                AND exchange = $3
+                AND status = 'OPEN'
+                LIMIT 1
+            `, [user.id, signal.symbol, targetExchange]);
+
+            if (openPosition.rows.length === 0) {
+                console.log(`ℹ️ No open position found for ${signal.symbol} on ${targetExchange}`);
+                return {
+                    userId: user.id,
+                    username: user.username,
+                    success: false,
+                    message: `No open position found for ${signal.symbol} on ${targetExchange}`,
+                    operation: 'CLOSE_POSITION'
+                };
+            }
+
+            const position = openPosition.rows[0];
+            console.log(`📍 Found open position: ${position.operation_id}`);
+
+            // Get exchange service to close position
+            const credentials = await this.apiKeyManager.getAPICredentials(user.id, targetExchange);
+            const exchangeService = await this.createUserExchangeService(targetExchange, credentials);
+
+            // Close the position
+            const exitPrice = parseFloat(signal.price) || 0;
+            const entryPrice = parseFloat(position.entry_price) || 0;
+            const quantity = parseFloat(position.quantity) || 0;
+
+            // Calculate P&L
+            const isLong = position.operation_type === 'LONG';
+            const pnlUsd = (exitPrice - entryPrice) * quantity * (isLong ? 1 : -1);
+            const pnlPercent = ((exitPrice - entryPrice) / entryPrice) * 100 * (isLong ? 1 : -1);
+            const isProfitable = pnlUsd > 0;
+
+            console.log(`💰 P&L Calculation:`, {
+                entryPrice,
+                exitPrice,
+                quantity,
+                pnlUsd: pnlUsd.toFixed(2),
+                pnlPercent: pnlPercent.toFixed(2) + '%',
+                isProfitable
+            });
+
+            // Calculate commission ONLY if profitable
+            let commission = 0;
+            let commissionPercent = 0;
+            if (isProfitable) {
+                const planConfig = this.PLAN_PRIORITIES[user.plan_type] || this.PLAN_PRIORITIES['TRIAL'];
+                commissionPercent = planConfig.commission || 0;
+                commission = (pnlUsd * commissionPercent) / 100;
+                console.log(`💵 Commission: ${commissionPercent}% of $${pnlUsd.toFixed(2)} = $${commission.toFixed(2)}`);
+            } else {
+                console.log(`ℹ️ No commission charged on losing trade`);
+            }
+
+            const netPnl = pnlUsd - commission;
+
+            // Close position in database
+            const duration = Math.floor((Date.now() - new Date(position.entry_time).getTime()) / 60000);
+            
+            await this.dbPoolManager.executeWrite(`
+                UPDATE trading_operations
+                SET
+                    exit_price = $1,
+                    exit_time = NOW(),
+                    status = 'CLOSED',
+                    duration_minutes = $2,
+                    profit_loss_usd = $3,
+                    profit_loss_percentage = $4,
+                    net_pnl = $5,
+                    commission_charged = $6,
+                    close_reason = $7,
+                    updated_at = NOW()
+                WHERE operation_id = $8
+            `, [
+                exitPrice,
+                duration,
+                pnlUsd,
+                pnlPercent,
+                netPnl,
+                commission,
+                operation, // 'CLOSE_POSITION' or 'CLOSE_POSITION_EMA21'
+                position.operation_id
+            ]);
+
+            console.log(`✅ Position closed: ${position.operation_id} - Net P&L: $${netPnl.toFixed(2)}`);
+
+            // Update affiliate commission if profitable
+            if (isProfitable && commission > 0) {
+                try {
+                    console.log(`🤝 Calculating affiliate commission for user ${user.id}...`);
+                    const affiliateCommission = await this.affiliateService.calculateTradingCommission(
+                        user.id, 
+                        commission // Commission amount goes to affiliate
+                    );
+                    
+                    if (affiliateCommission) {
+                        console.log(`💰 Affiliate commission: $${affiliateCommission.commission.toFixed(2)} for affiliate ${affiliateCommission.affiliateId}`);
+                        
+                        tradingWebSocket.broadcastAffiliateCommission(affiliateCommission.affiliateId, {
+                            affiliateId: affiliateCommission.affiliateId,
+                            amount: affiliateCommission.commission,
+                            source: 'trading_profit',
+                            description: `Profit commission from ${user.username} - ${signal.symbol} closed`
+                        });
+                    }
+                } catch (error) {
+                    console.error(`❌ Error calculating affiliate commission:`, error);
+                }
+            }
+
+            // Broadcast position closed
+            tradingWebSocket.broadcastOperationClosed(user.id, {
+                position_id: position.position_id || position.id,
+                symbol: signal.symbol,
+                entry_price: entryPrice,
+                exit_price: exitPrice,
+                profit_loss_usd: pnlUsd,
+                profit_loss_percentage: pnlPercent,
+                net_pnl: netPnl,
+                commission: commission,
+                duration_minutes: duration,
+                close_reason: operation
+            });
+
+            // Update user performance
+            await this.updateUserPerformance(user.id);
+
+            return {
+                userId: user.id,
+                username: user.username,
+                exchange: targetExchange,
+                success: true,
+                operation: 'CLOSE_POSITION',
+                positionClosed: true,
+                symbol: signal.symbol,
+                entryPrice,
+                exitPrice,
+                pnlUsd,
+                pnlPercent,
+                commission,
+                netPnl,
+                isProfitable,
+                duration,
+                message: `Position closed - ${isProfitable ? 'Profit' : 'Loss'}: $${pnlUsd.toFixed(2)} (${pnlPercent.toFixed(2)}%)`,
+                timestamp: new Date().toISOString(),
+                personalKey: true
+            };
+
+        } catch (error) {
+            console.error(`❌ Error handling close position:`, error);
+            return {
+                userId: user.id,
+                username: user.username,
+                success: false,
+                message: error.message,
+                operation: 'CLOSE_POSITION'
             };
         }
     }
@@ -423,12 +1029,17 @@ class PersonalTradingEngine {
             // Create exchange service with user's credentials
             const exchangeService = await this.createUserExchangeService(exchange, credentials);
 
-            // Prepare trade parameters
+            // Prepare trade parameters for futures/perpetual isolated by default
+            const marginMode = await this.getUserMarginMode(user.id);
             const tradeParams = {
+                category: 'linear', // futures/perpetual
                 symbol: signal.symbol,
                 side: aiDecision.action === 'BUY' ? 'Buy' : 'Sell',
                 orderType: 'Market',
                 qty: calculatedQty,
+                timeInForce: 'IOC',
+                reduceOnly: false,
+                positionIdx: marginMode === 'ISOLATED' ? 1 : 0, // 1 isolated, 0 cross in Bybit
                 stopLoss: aiDecision.stopLoss,
                 takeProfit: aiDecision.takeProfit
             };
@@ -504,48 +1115,107 @@ class PersonalTradingEngine {
     async createUserExchangeService(exchange, credentials) {
         if (exchange.toLowerCase() === 'bybit') {
             const BybitService = require('../../services/exchange/bybit-service');
-            // Pass credentials directly to constructor
             return new BybitService({
                 apiKey: credentials.apiKey,
-                apiSecret: credentials.apiSecret,
-                isTestnet: credentials.isTestnet || false
+                apiSecret: credentials.apiSecret
             });
         } else {
             const BinanceService = require('../../services/exchange/binance-service');
-            // Pass credentials directly to constructor
             return new BinanceService({
                 apiKey: credentials.apiKey,
-                apiSecret: credentials.apiSecret,
-                isTestnet: credentials.isTestnet || false
+                apiSecret: credentials.apiSecret
             });
         }
     }
 
     /**
-     * Calculate position size based on user balance and risk
+     * Get balance of specific token from exchange
+     * @param {string} exchange - Exchange name (bybit/binance)
+     * @param {object} credentials - User's API credentials
+     * @param {string} symbol - Trading pair (e.g., BTCUSDT)
+     * @returns {object} { token: 'USDT', balance: 1000.50 }
      */
-    calculatePositionSize(user, signal) {
-        const availableBalance = Math.max(user.operationalBalance.brl / 5.5, user.operationalBalance.usd);
-
-        // Convert risk_level (can be string 'low'/'medium'/'high' or number)
-        let riskLevel = 2; // default medium
-        if (typeof user.risk_level === 'string') {
-            const riskMap = {
-                'low': 1,
-                'medium': 2,
-                'high': 5,
-                'very_high': 10
-            };
-            riskLevel = riskMap[user.risk_level.toLowerCase()] || 2;
-        } else if (typeof user.risk_level === 'number') {
-            riskLevel = user.risk_level;
+    async getRealExchangeBalance(exchange, credentials, symbol) {
+        try {
+            // Extract quote currency from trading pair
+            // BTCUSDT → USDT, ETHUSDT → USDT, BTCBUSD → BUSD
+            const quoteCurrency = this.getQuoteCurrency(symbol);
+            console.log(`🔍 Fetching ${quoteCurrency} balance from ${exchange} API...`);
+            
+            const exchangeService = await this.createUserExchangeService(exchange, credentials);
+            
+            if (exchange === 'bybit') {
+                const walletBalance = await exchangeService.getWalletBalance('UNIFIED');
+                
+                if (walletBalance && walletBalance.success && walletBalance.result) {
+                    const walletData = walletBalance.result.list?.[0] || {};
+                    const coins = walletData.coin || [];
+                    
+                    // Find the specific token
+                    const tokenData = coins.find(c => c.coin === quoteCurrency);
+                    const tokenBalance = tokenData 
+                        ? parseFloat(tokenData.walletBalance || 0)
+                        : 0;
+                    
+                    console.log(`✅ Bybit ${quoteCurrency} balance: ${tokenBalance.toFixed(2)}`);
+                    return {
+                        token: quoteCurrency,
+                        balance: tokenBalance
+                    };
+                }
+                
+                console.log(`⚠️ Bybit: No wallet data found`);
+                return { token: quoteCurrency, balance: 0 };
+                
+            } else if (exchange === 'binance') {
+                const accountInfo = await exchangeService.getAccountBalance();
+                
+                if (accountInfo && accountInfo.success && accountInfo.result) {
+                    const balances = accountInfo.result.balances || [];
+                    
+                    // Find the specific token
+                    const tokenData = balances.find(b => b.asset === quoteCurrency);
+                    const tokenBalance = tokenData 
+                        ? parseFloat(tokenData.free || 0) + parseFloat(tokenData.locked || 0)
+                        : 0;
+                    
+                    console.log(`✅ Binance ${quoteCurrency} balance: ${tokenBalance.toFixed(2)}`);
+                    return {
+                        token: quoteCurrency,
+                        balance: tokenBalance
+                    };
+                }
+                
+                console.log(`⚠️ Binance: No account data found`);
+                return { token: quoteCurrency, balance: 0 };
+            }
+            
+            return { token: quoteCurrency, balance: 0 };
+            
+        } catch (error) {
+            console.error(`❌ Error fetching balance from ${exchange}:`, error.message);
+            return { token: 'USDT', balance: 0 };
         }
+    }
 
-        const riskPercent = riskLevel / 100;
-        const maxPositionSize = availableBalance * riskPercent;
-        const minPositionSize = 10;
-
-        return Math.max(minPositionSize, Math.min(maxPositionSize, availableBalance * 0.1));
+    /**
+     * Extract quote currency from trading pair
+     * BTCUSDT → USDT, ETHBUSD → BUSD, LINKUSDT.P → USDT
+     */
+    getQuoteCurrency(symbol) {
+        // Remove .P suffix for perpetual futures
+        const cleanSymbol = symbol.replace('.P', '');
+        
+        // Common quote currencies
+        if (cleanSymbol.endsWith('USDT')) return 'USDT';
+        if (cleanSymbol.endsWith('BUSD')) return 'BUSD';
+        if (cleanSymbol.endsWith('USDC')) return 'USDC';
+        if (cleanSymbol.endsWith('USD')) return 'USD';
+        if (cleanSymbol.endsWith('BTC')) return 'BTC';
+        if (cleanSymbol.endsWith('ETH')) return 'ETH';
+        
+        // Default to USDT
+        return 'USDT';
     }
 
     /**
@@ -606,39 +1276,28 @@ class PersonalTradingEngine {
 
             await this.dbPoolManager.executeWrite(`
                 INSERT INTO trading_operations (
-                    user_id, operation_id, trade_id, trading_pair, operation_type,
-                    side, entry_price, quantity, exchange, order_id,
-                    position_size, commission_percent, plan_type,
-                    status, entry_time, personal_key, simulated, success,
-                    error_message, signal_source, metadata
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-                RETURNING id, operation_id
+                    user_id, position_id, signal_id, symbol, operation_type,
+                    side, entry_price, quantity, exchange, exchange_order_id,
+                    amount, commission, leverage,
+                    status, entry_time
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                RETURNING id, position_id
             `, [
-                tradeData.userId,
-                operationId,
-                tradeId,
-                tradeData.symbol,
-                tradeData.side === 'BUY' ? 'LONG' : 'SHORT',
-                tradeData.side,
-                tradeData.executedPrice,
-                tradeData.executedQty,
-                tradeData.exchange,
-                tradeData.orderId,
-                tradeData.positionSize,
-                tradeData.commission,
-                tradeData.planType,
-                'OPEN', // Initially OPEN
-                new Date().toISOString(),
-                tradeData.personalKey || true,
-                false, // Not simulated
-                tradeData.success,
-                tradeData.success ? null : tradeData.message,
-                'AI',
-                JSON.stringify({
-                    timestamp: tradeData.timestamp,
-                    personalKey: tradeData.personalKey,
-                    username: tradeData.username
-                })
+                tradeData.userId,                                    // $1: user_id
+                operationId,                                         // $2: position_id
+                tradeId,                                             // $3: signal_id
+                tradeData.symbol,                                    // $4: symbol
+                tradeData.side === 'BUY' ? 'LONG' : 'SHORT',        // $5: operation_type
+                tradeData.side,                                      // $6: side
+                tradeData.executedPrice,                             // $7: entry_price
+                tradeData.executedQty,                               // $8: quantity
+                tradeData.exchange,                                  // $9: exchange
+                tradeData.orderId,                                   // $10: exchange_order_id
+                tradeData.positionSize,                              // $11: amount
+                tradeData.commission || 0,                           // $12: commission
+                tradeData.leverage || 1,                             // $13: leverage
+                'OPEN',                                              // $14: status
+                new Date().toISOString()                             // $15: entry_time
             ]);
 
             console.log(`💾 Trade saved to trading_operations: ${operationId} for user ${tradeData.username}`);
@@ -646,8 +1305,8 @@ class PersonalTradingEngine {
             // Broadcast new operation to user via WebSocket
             const tradingWebSocket = require('../../services/websocket/trading-websocket');
             tradingWebSocket.broadcastNewOperation(tradeData.userId, {
-                operation_id: operationId,
-                trading_pair: tradeData.symbol,
+                position_id: operationId,
+                symbol: tradeData.symbol,
                 operation_type: tradeData.side === 'BUY' ? 'LONG' : 'SHORT',
                 entry_price: tradeData.executedPrice,
                 quantity: tradeData.executedQty,
@@ -699,8 +1358,8 @@ class PersonalTradingEngine {
             // Broadcast operation closed to user via WebSocket
             const tradingWebSocket = require('../../services/websocket/trading-websocket');
             tradingWebSocket.broadcastOperationClosed(exitData.userId, {
-                operation_id: operationId,
-                trading_pair: exitData.symbol,
+                position_id: operationId,
+                symbol: exitData.symbol,
                 entry_price: exitData.entryPrice,
                 exit_price: exitData.exitPrice,
                 profit_loss_usd: profitLossUsd,

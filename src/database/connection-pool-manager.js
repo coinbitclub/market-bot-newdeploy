@@ -359,7 +359,7 @@ class ConnectionPoolManager extends EventEmitter {
      * 🏥 Testar conexões
      */
     async testConnections() {
-        console.log('🏥 Testando conexões...');
+        console.log('🏥 Testing connections...');
 
         // Testar master
         try {
@@ -367,7 +367,6 @@ class ConnectionPoolManager extends EventEmitter {
             await client.query('SELECT NOW()');
             client.release();
             this.healthStatus.master = true;
-            console.log('✅ Master: Saudável');
         } catch (error) {
             this.healthStatus.master = false;
             console.error('❌ Master: Indisponível -', error.message);
@@ -380,19 +379,20 @@ class ConnectionPoolManager extends EventEmitter {
                 await client.query('SELECT NOW()');
                 client.release();
                 this.healthStatus.replicas[i] = true;
-                console.log(`✅ Replica ${i + 1}: Saudável`);
             } catch (error) {
                 this.healthStatus.replicas[i] = false;
                 console.error(`❌ Replica ${i + 1}: Indisponível -`, error.message);
             }
         }
+
+        console.log('Connected Database...');
     }
 
     /**
      * 🏥 Iniciar health checks periódicos
      */
-    startHealthChecks() {
-        setInterval(async () => {
+    async startHealthChecks() {
+        // setInterval(async () => {
             await this.testConnections();
             
             const healthyReplicas = this.healthStatus.replicas.filter(status => status).length;
@@ -408,7 +408,7 @@ class ConnectionPoolManager extends EventEmitter {
                 console.error('🚨 ALERTA: Todas as réplicas indisponíveis!');
             }
             
-        }, this.config.healthCheckInterval);
+        // }, this.config.healthCheckInterval);
     }
 
     /**

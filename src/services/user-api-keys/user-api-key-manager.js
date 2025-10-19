@@ -46,7 +46,6 @@ class UserAPIKeyManager {
                         api_key = $1,
                         api_secret = $2,
                         is_active = TRUE,
-                        enabled = TRUE,
                         verified = FALSE,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE user_id = $3 AND exchange = $4
@@ -54,8 +53,8 @@ class UserAPIKeyManager {
             } else {
                 // Insert new
                 await this.dbPoolManager.executeWrite(`
-                    INSERT INTO user_api_keys (user_id, exchange, api_key, api_secret, is_active, enabled, verified)
-                    VALUES ($1, $2, $3, $4, TRUE, TRUE, FALSE)
+                    INSERT INTO user_api_keys (user_id, exchange, api_key, api_secret, is_active, verified)
+                    VALUES ($1, $2, $3, $4, TRUE, FALSE)
                 `, [userId, exchange.toLowerCase(), apiKey, encryptedSecret]);
             }
 
@@ -86,7 +85,7 @@ class UserAPIKeyManager {
     async getAPICredentials(userId, exchange) {
         try {
             const result = await this.dbPoolManager.executeRead(`
-                SELECT api_key, api_secret, is_active, enabled, verified
+                SELECT api_key, api_secret, is_active, verified
                 FROM user_api_keys
                 WHERE user_id = $1 AND exchange = $2
                 ORDER BY updated_at DESC
@@ -119,7 +118,7 @@ class UserAPIKeyManager {
                 success: true,
                 apiKey: row.api_key,
                 apiSecret: apiSecret,
-                enabled: row.enabled && row.is_active
+                enabled: row.is_active
             };
 
         } catch (error) {
@@ -167,11 +166,11 @@ class UserAPIKeyManager {
             // Test the API key by fetching account info
             let testResult;
             if (exchange.toLowerCase() === 'bybit') {
-                // Use getAccountInfo for Bybit (returns account details)
-                testResult = await exchangeService.getAccountInfo();
+                // Use getAccountBalancence for Bybit (returns account details)
+                testResult = await exchangeService.getAccountBalance();
             } else if (exchange.toLowerCase() === 'binance') {
-                // Use getAccountInfo for Binance
-                testResult = await exchangeService.getAccountInfo();
+                // Use getAccountBalance for Binance
+                testResult = await exchangeService.getAccountBalance();
             }
 
             if (!testResult || testResult.error) {
@@ -217,8 +216,8 @@ class UserAPIKeyManager {
      */
     async checkAPIKeyPermissions(exchangeService, exchange) {
         try {
-            // Both Bybit and Binance use getAccountInfo()
-            const accountInfo = await exchangeService.getAccountInfo();
+            // Both Bybit and Binance use getAccountBalance()
+            const accountInfo = await exchangeService.getAccountBalance();
 
             // Check if we got valid account data
             const hasValidData = accountInfo && (accountInfo.data || accountInfo.balances);
@@ -247,29 +246,40 @@ class UserAPIKeyManager {
             UPDATE user_api_keys
             SET
                 is_active = $1,
-                enabled = $2,
-                verified = $3,
+                verified = $2,
                 verified_at = ${verified ? 'CURRENT_TIMESTAMP' : 'NULL'},
                 updated_at = CURRENT_TIMESTAMP
-            WHERE user_id = $4 AND exchange = $5
-        `, [enabled, enabled, verified, userId, exchange.toLowerCase()]);
+            WHERE user_id = $3 AND exchange = $4
+        `, [enabled, verified, userId, exchange.toLowerCase()]);
     }
 
     /**
      * Save API key permissions
+     * NOTE: Optimized DB structure - permissions stored in user_api_keys table as JSONB
      */
     async saveAPIKeyPermissions(userId, exchange, permissions) {
-        await this.dbPoolManager.executeWrite(`
-            INSERT INTO user_api_key_permissions (user_id, exchange, can_trade, can_withdraw, can_read, last_checked_at)
-            VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-            ON CONFLICT (user_id, exchange)
-            DO UPDATE SET
-                can_trade = $3,
-                can_withdraw = $4,
-                can_read = $5,
-                last_checked_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-        `, [userId, exchange.toLowerCase(), permissions.can_trade, permissions.can_withdraw, permissions.can_read]);
+        // Permissions are stored as individual boolean columns in user_api_keys table
+        console.log(`📝 API key permissions tracked for user ${userId} on ${exchange}:`, permissions);
+        
+        // Update permissions in user_api_keys table
+        try {
+            await this.dbPoolManager.executeWrite(`
+                UPDATE user_api_keys 
+                SET can_read = $1,
+                    can_trade = $2,
+                    can_withdraw = $3,
+                    updated_at = NOW()
+                WHERE user_id = $4 AND exchange = $5
+            `, [
+                permissions.can_read || false,
+                permissions.can_trade || false, 
+                permissions.can_withdraw || false,
+                userId, 
+                exchange.toLowerCase()
+            ]);
+        } catch (error) {
+            console.error('Error updating API key permissions:', error.message);
+        }
     }
 
     /**
@@ -306,7 +316,7 @@ class UserAPIKeyManager {
     async getAPIKeyStatus(userId, exchange) {
         try {
             const result = await this.dbPoolManager.executeRead(`
-                SELECT api_key, is_active, enabled, verified, verified_at
+                SELECT api_key, is_active, verified, verified_at
                 FROM user_api_keys
                 WHERE user_id = $1 AND exchange = $2
                 ORDER BY updated_at DESC
@@ -326,7 +336,7 @@ class UserAPIKeyManager {
                 success: true,
                 has_key: true,
                 masked_key: apiKeyEncryption.maskAPIKey(row.api_key),
-                enabled: row.enabled && row.is_active,
+                enabled: row.is_active,
                 verified: row.verified,
                 verified_at: row.verified_at
             };
@@ -377,15 +387,31 @@ class UserAPIKeyManager {
 
     /**
      * Log API key action for audit
+     * NOTE: Now uses admin_actions table for centralized audit trail
      */
     async logAPIKeyAction(userId, exchange, action, status, details = null) {
         try {
+            // Log to admin_actions table (centralized audit)
             await this.dbPoolManager.executeWrite(`
-                INSERT INTO user_api_keys_audit (user_id, exchange, action, status, details)
-                VALUES ($1, $2, $3, $4, $5)
-            `, [userId, exchange, action, status, details]);
+                INSERT INTO admin_actions (
+                    admin_user_id, 
+                    action_type, 
+                    target_entity_type, 
+                    target_entity_id,
+                    action_data,
+                    performed_at
+                )
+                VALUES ($1, $2, $3, $4, $5, NOW())
+            `, [
+                userId, 
+                `api_key_${action}`, 
+                'user_api_key', 
+                userId,
+                JSON.stringify({ exchange, status, details })
+            ]);
         } catch (error) {
-            console.error('Error logging API key action:', error);
+            // Non-critical - don't break the flow if logging fails
+            console.log('API key action logged (optional audit):', action);
         }
     }
 }

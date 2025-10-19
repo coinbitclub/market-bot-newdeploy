@@ -279,15 +279,16 @@ class RealOperationsService {
             const result = await this.pool.query(`
                 SELECT
                     id,
-                    operation_id as id,
-                    trading_pair as pair,
+                    position_id,
+                    symbol as pair,
                     operation_type as type,
                     entry_price as "entryPrice",
                     quantity,
                     status,
                     entry_time as timestamp,
-                    COALESCE(stop_loss, entry_price * 0.95) as "stopLoss",
-                    COALESCE(take_profit, entry_price * 1.05) as "takeProfit"
+                    exchange,
+                    side,
+                    leverage
                 FROM trading_operations
                 WHERE user_id = $1
                 AND status = 'OPEN'
@@ -584,11 +585,11 @@ class RealOperationsService {
             // Create new signal in database
             const result = await this.pool.query(`
                 INSERT INTO trading_operations (
-                    user_id, operation_id, trading_pair, operation_type, 
-                    entry_price, quantity, status, entry_time, 
-                    signal_source, confidence_score, reasoning
+                    user_id, signal_id, symbol, operation_type, 
+                    entry_price, quantity, status, entry_time,
+                    exchange, side
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
                 ) RETURNING id
             `, [
                 userId,
@@ -599,9 +600,8 @@ class RealOperationsService {
                 0, // quantity (will be filled when executed)
                 'SIGNAL_GENERATED',
                 new Date(),
-                'AI',
-                confidence,
-                reasoning
+                'binance', // default exchange
+                direction === 'BUY' ? 'LONG' : 'SHORT' // side
             ]);
 
             return {

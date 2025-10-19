@@ -48,7 +48,7 @@ class AuthMiddleware {
                 req.user = {
                     id: decoded.userId || decoded.id,
                     email: decoded.email,
-                    userType: decoded.userType || decoded.user_type,
+                    role: decoded.role || decoded.userType || 'user',
                     permissions: decoded.permissions || []
                 };
 
@@ -86,7 +86,7 @@ class AuthMiddleware {
                 req.user = {
                     id: decoded.userId || decoded.id,
                     email: decoded.email,
-                    userType: decoded.userType || decoded.user_type
+                    role: decoded.role || decoded.userType || 'user'
                 };
 
                 next();

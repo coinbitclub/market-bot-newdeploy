@@ -105,7 +105,7 @@ async function debugBinanceBalance() {
 
         console.log('Step 5: Fetching account info...');
         try {
-            const balance = await service.getAccountInfo();
+            const balance = await service.getAccountBalance();
             
             if (balance && balance.success) {
                 console.log('✅ SUCCESS! Binance API responded\n');
@@ -184,4 +184,5 @@ async function debugBinanceBalance() {
 }
 
 debugBinanceBalance();
+
 

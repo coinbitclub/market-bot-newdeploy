@@ -383,22 +383,22 @@ class StripeWebhooksRoutes {
                 ]
             );
 
-            // Create/update user_trading_settings if it doesn't exist
+            // Update user trading settings in consolidated users table
             await this.dbPoolManager.executeWrite(
-                `INSERT INTO user_trading_settings (
-                    user_id, max_leverage, take_profit_percentage, stop_loss_percentage,
-                    position_size_percentage, risk_level, auto_trade_enabled,
-                    daily_loss_limit_percentage, max_open_positions, default_leverage,
-                    stop_loss_multiplier, take_profit_multiplier
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                ON CONFLICT (user_id) DO UPDATE SET
+                `UPDATE users SET
                     max_leverage = $2,
                     take_profit_percentage = $3,
                     stop_loss_percentage = $4,
+                    position_size_percentage = $5,
+                    risk_level = $6,
                     auto_trade_enabled = $7,
+                    daily_loss_limit_percentage = $8,
                     max_open_positions = $9,
                     default_leverage = $10,
-                    updated_at = NOW()`,
+                    stop_loss_multiplier = $11,
+                    take_profit_multiplier = $12,
+                    updated_at = NOW()
+                WHERE id = $1`,
                 [
                     userId,
                     config.max_leverage,

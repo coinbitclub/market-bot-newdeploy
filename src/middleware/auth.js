@@ -63,7 +63,7 @@ class AuthMiddleware {
             
             // Buscar usuário no banco para verificar se ainda está ativo
             const userResult = await this.dbPoolManager.executeRead(
-                'SELECT id, email, user_type, is_active, is_admin FROM users WHERE id = $1',
+                'SELECT id, email, role FROM users WHERE id = $1',
                 [decoded.userId]
             );
 
@@ -76,20 +76,13 @@ class AuthMiddleware {
 
             const user = userResult.rows[0];
 
-            if (!user.is_active) {
-                return res.status(401).json({
-                    success: false,
-                    error: 'Conta desativada'
-                });
-            }
-
             // Adicionar informações do usuário ao request
             req.user = {
                 id: user.id,
                 email: user.email,
-                user_type: user.user_type,
-                is_admin: user.is_admin,
-                permissions: this.getUserPermissions(user.user_type)
+                role: user.role,
+                is_admin: user.role === 'admin',
+                permissions: this.getUserPermissions(user.role)
             };
 
             // Atualizar última atividade
@@ -135,12 +128,12 @@ class AuthMiddleware {
                 });
             }
 
-            if (!allowedTypes.includes(req.user.user_type)) {
+            if (!allowedTypes.includes(req.user.role)) {
                 return res.status(403).json({
                     success: false,
                     error: 'Permissão negada',
                     required: allowedTypes,
-                    current: req.user.user_type
+                    current: req.user.role
                 });
             }
 
@@ -185,7 +178,7 @@ class AuthMiddleware {
             });
         }
 
-        if (!req.user.is_admin && req.user.user_type !== 'ADMIN') {
+        if (!req.user.is_admin && req.user.role !== 'admin') {
             return res.status(403).json({
                 success: false,
                 error: 'Acesso de administrador necessário'
@@ -209,7 +202,7 @@ class AuthMiddleware {
 
             // Verificar se a sessão ainda está ativa
             const sessionResult = await this.dbPoolManager.executeRead(
-                'SELECT * FROM user_sessions WHERE user_id = $1 AND is_active = true AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+                'SELECT * FROM user_sessions WHERE user_id = $1 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
                 [req.user.id]
             );
 
@@ -251,7 +244,7 @@ class AuthMiddleware {
             }
 
             // Verificar se 2FA está habilitado para este tipo de usuário
-            const requires2FA = ['ADMIN', 'GESTOR'].includes(req.user.user_type);
+            const requires2FA = ['admin', 'affiliate'].includes(req.user.role);
 
             if (!requires2FA) {
                 return next();
@@ -359,18 +352,18 @@ class AuthMiddleware {
             
             // Buscar usuário no banco
             const userResult = await this.dbPoolManager.executeRead(
-                'SELECT id, email, user_type, is_active, is_admin FROM users WHERE id = $1',
+                'SELECT id, email, role FROM users WHERE id = $1',
                 [decoded.userId]
             );
 
-            if (userResult.rows.length > 0 && userResult.rows[0].is_active) {
+            if (userResult.rows.length > 0) {
                 const user = userResult.rows[0];
                 req.user = {
                     id: user.id,
                     email: user.email,
-                    user_type: user.user_type,
-                    is_admin: user.is_admin,
-                    permissions: this.getUserPermissions(user.user_type)
+                    role: user.role,
+                    is_admin: user.role === 'admin',
+                    permissions: this.getUserPermissions(user.role)
                 };
             }
 
@@ -434,7 +427,7 @@ class AuthMiddleware {
             
             // Buscar usuário
             const userResult = await this.dbPoolManager.executeRead(
-                'SELECT * FROM users WHERE id = $1 AND is_active = true',
+                'SELECT * FROM users WHERE id = $1',
                 [decoded.userId]
             );
 
@@ -448,9 +441,9 @@ class AuthMiddleware {
             const payload = {
                 userId: user.id,
                 email: user.email,
-                userType: user.user_type,
+                role: user.role,
                 affiliateId: user.affiliate_id,
-                permissions: this.getUserPermissions(user.user_type),
+                permissions: this.getUserPermissions(user.role),
                 timestamp: Date.now()
             };
 
