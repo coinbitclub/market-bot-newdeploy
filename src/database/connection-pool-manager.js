@@ -229,6 +229,18 @@ class ConnectionPoolManager extends EventEmitter {
      */
     async executeWrite(query, params = []) {
         try {
+            // Check if we're in mock mode
+            if (!this.pools.master) {
+                console.log('⚠️ Database not available, running in mock mode');
+                return { rows: [], rowCount: 0 };
+            }
+
+            // Validate query
+            if (!query || query.trim() === '') {
+                console.error('❌ Empty query provided to executeWrite');
+                throw new Error('Empty query provided');
+            }
+
             this.stats.queries++;
             this.stats.writes++;
             this.stats.masterQueries++;
@@ -255,6 +267,18 @@ class ConnectionPoolManager extends EventEmitter {
      */
     async executeRead(query, params = []) {
         try {
+            // Check if we're in mock mode
+            if (!this.pools.master) {
+                console.log('⚠️ Database not available, running in mock mode');
+                return { rows: [], rowCount: 0 };
+            }
+
+            // Validate query
+            if (!query || query.trim() === '') {
+                console.error('❌ Empty query provided to executeRead');
+                throw new Error('Empty query provided');
+            }
+
             this.stats.queries++;
             this.stats.reads++;
 
@@ -384,8 +408,6 @@ class ConnectionPoolManager extends EventEmitter {
                 console.error(`❌ Replica ${i + 1}: Indisponível -`, error.message);
             }
         }
-
-        console.log('Connected Database...');
     }
 
     /**

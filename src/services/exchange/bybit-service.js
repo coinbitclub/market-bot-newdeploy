@@ -221,25 +221,31 @@ class BybitService {
                 category, 
                 symbol: symbol ? symbol.toUpperCase() : undefined 
             });
-            const list = data.result?.list || [];
-            return list.map(order => ({
-                orderId: order.orderId,
-                orderLinkId: order.orderLinkId,
-                symbol: order.symbol,
-                price: parseFloat(order.price),
-                qty: parseFloat(order.qty),
-                side: order.side,
-                orderStatus: order.orderStatus,
-                avgPrice: parseFloat(order.avgPrice),
-                timeInForce: order.timeInForce,
-                orderType: order.orderType,
-                createdTime: order.createdTime,
-                updatedTime: order.updatedTime,
-                timestamp: Date.now()
-            }));
+            
+            if (data.retCode === 0) {
+                const list = data.result?.list || [];
+                return list.map(order => ({
+                    orderId: order.orderId,
+                    orderLinkId: order.orderLinkId,
+                    symbol: order.symbol,
+                    price: parseFloat(order.price),
+                    qty: parseFloat(order.qty),
+                    side: order.side,
+                    orderStatus: order.orderStatus,
+                    avgPrice: parseFloat(order.avgPrice),
+                    timeInForce: order.timeInForce,
+                    orderType: order.orderType,
+                    createdTime: order.createdTime,
+                    updatedTime: order.updatedTime,
+                    timestamp: Date.now()
+                }));
+            } else {
+                console.error(`❌ Error fetching open orders: ${data.retMsg} (Code: ${data.retCode})`);
+                return [];
+            }
         } catch (error) {
             console.error('❌ Error fetching open orders:', error.message);
-            throw error;
+            return [];
         }
     }
 
@@ -253,25 +259,64 @@ class BybitService {
             if (price) params.price = price.toString();
             if (orderLinkId) params.orderLinkId = orderLinkId;
 
-            const data = await this.client.placeOrder(params);
+            console.log(`🔥 Placing order with params:`, params);
+            const data = await this.client.submitOrder(params);
             const result = data.result;
-            return { success: true, orderId: result.orderId, orderLinkId: result.orderLinkId, timestamp: Date.now() };
+            
+            if (data.retCode === 0) {
+                console.log(`✅ Order placed successfully: ${result.orderId}`);
+                return { 
+                    success: true, 
+                    orderId: result.orderId, 
+                    orderLinkId: result.orderLinkId, 
+                    price: result.price,
+                    timestamp: Date.now() 
+                };
+            } else {
+                console.error(`❌ Order placement failed: ${data.retMsg} (Code: ${data.retCode})`);
+                return { 
+                    success: false, 
+                    error: data.retMsg || 'Order placement failed',
+                    retCode: data.retCode
+                };
+            }
         } catch (error) {
             console.error('❌ Error placing order:', error.message);
-            throw error;
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
-    async cancelOrder(symbol, orderId, category = 'spot') {
+    async cancelOrder(symbol, orderId, category = 'linear') {
         try {
             if (!this.hasCredentials) {
                 throw new Error('Bybit API credentials not configured');
             }
             const data = await this.client.cancelOrder({ category, symbol: symbol.toUpperCase(), orderId: orderId.toString() });
-            return { success: true, orderId: data.result?.orderId, orderLinkId: data.result?.orderLinkId, timestamp: Date.now() };
+            
+            if (data.retCode === 0) {
+                return { 
+                    success: true, 
+                    orderId: data.result?.orderId, 
+                    orderLinkId: data.result?.orderLinkId, 
+                    timestamp: Date.now() 
+                };
+            } else {
+                console.error(`❌ Order cancellation failed: ${data.retMsg} (Code: ${data.retCode})`);
+                return { 
+                    success: false, 
+                    error: data.retMsg || 'Order cancellation failed',
+                    retCode: data.retCode
+                };
+            }
         } catch (error) {
             console.error('❌ Error canceling order:', error.message);
-            throw error;
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
@@ -347,17 +392,244 @@ class BybitService {
         }
     }
 
-    async getOrderHistory(category = 'spot', symbol = null, limit = 50) {
+    async getOrderHistory(category = 'linear', symbol = null, limit = 50) {
         try {
             if (!this.hasCredentials) {
                 throw new Error('Bybit API credentials not configured');
             }
-            const data = await this.client.getOrderHistory({ category, symbol: symbol ? symbol.toUpperCase() : undefined, limit });
-            return { success: true, data: data.result?.list || [], timestamp: Date.now() };
+            const data = await this.client.getHistoricOrders({ category, symbol: symbol ? symbol.toUpperCase() : undefined, limit });
+
+            if (data.retCode === 0) {
+                return { success: true, data: data.result?.list || [], timestamp: Date.now() };
+            } else {
+                console.error(`❌ Error fetching order history: ${data.retMsg} (Code: ${data.retCode})`);
+                return { success: false, error: data.retMsg || 'Failed to fetch order history', retCode: data.retCode };
+            }
         } catch (error) {
             console.error('❌ Error fetching order history:', error.message);
             return { success: false, error: error.message };
         }
+    }
+
+    /**
+     * Get real-time order status
+     * @param {string} symbol - Trading symbol
+     * @param {string} orderId - Order ID
+     * @param {string} category - Category (linear/spot)
+     * @returns {Promise<Object>} Order details
+     */
+    async getOrderStatus(symbol, orderId, category = 'linear') {
+        try {
+            if (!this.hasCredentials) {
+                throw new Error('Bybit API credentials not configured');
+            }
+
+            const data = await this.client.getActiveOrders({
+                category,
+                symbol: symbol.toUpperCase(),
+                orderId: orderId.toString()
+            });
+
+            if (data.retCode === 0 && data.result?.list?.length > 0) {
+                const order = data.result.list[0];
+                return {
+                    success: true,
+                    order: {
+                        orderId: order.orderId,
+                        symbol: order.symbol,
+                        side: order.side,
+                        orderType: order.orderType,
+                        price: parseFloat(order.price || 0),
+                        qty: parseFloat(order.qty || 0),
+                        cumExecQty: parseFloat(order.cumExecQty || 0),
+                        cumExecValue: parseFloat(order.cumExecValue || 0),
+                        avgPrice: parseFloat(order.avgPrice || 0),
+                        orderStatus: order.orderStatus,
+                        timeInForce: order.timeInForce,
+                        createdTime: order.createdTime,
+                        updatedTime: order.updatedTime
+                    }
+                };
+            }
+
+            // Order not in active orders, check historical orders
+            const histData = await this.client.getHistoricOrders({
+                category,
+                symbol: symbol.toUpperCase(),
+                orderId: orderId.toString(),
+                limit: 1
+            });
+
+            if (histData.retCode === 0 && histData.result?.list?.length > 0) {
+                const order = histData.result.list[0];
+                return {
+                    success: true,
+                    order: {
+                        orderId: order.orderId,
+                        symbol: order.symbol,
+                        side: order.side,
+                        orderType: order.orderType,
+                        price: parseFloat(order.price || 0),
+                        qty: parseFloat(order.qty || 0),
+                        cumExecQty: parseFloat(order.cumExecQty || 0),
+                        cumExecValue: parseFloat(order.cumExecValue || 0),
+                        avgPrice: parseFloat(order.avgPrice || 0),
+                        orderStatus: order.orderStatus,
+                        timeInForce: order.timeInForce,
+                        createdTime: order.createdTime,
+                        updatedTime: order.updatedTime
+                    }
+                };
+            }
+
+            return {
+                success: false,
+                error: 'Order not found'
+            };
+
+        } catch (error) {
+            console.error('❌ Error getting order status:', error.message);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Verify order fill and get execution details
+     * Waits for order to be filled and returns actual execution data
+     * @param {string} symbol - Trading symbol
+     * @param {string} orderId - Order ID
+     * @param {string} category - Category (linear/spot)
+     * @param {number} maxWaitMs - Maximum wait time in milliseconds (default: 10000)
+     * @returns {Promise<Object>} Execution details with actual fill price, qty, fees
+     */
+    async verifyOrderFill(symbol, orderId, category = 'linear', maxWaitMs = 10000) {
+        const startTime = Date.now();
+        const checkInterval = 500; // Check every 500ms
+
+        console.log(`🔍 Verifying order fill for ${orderId} on ${symbol}...`);
+
+        while (Date.now() - startTime < maxWaitMs) {
+            try {
+                const statusResult = await this.getOrderStatus(symbol, orderId, category);
+
+                if (!statusResult.success) {
+                    // Wait and retry
+                    await new Promise(resolve => setTimeout(resolve, checkInterval));
+                    continue;
+                }
+
+                const order = statusResult.order;
+                const status = order.orderStatus;
+
+                console.log(`📊 Order ${orderId} status: ${status}, filled: ${order.cumExecQty}/${order.qty}`);
+
+                // Check if order is filled
+                if (status === 'Filled') {
+                    const avgPrice = order.avgPrice || (order.cumExecValue / order.cumExecQty);
+
+                    console.log(`✅ Order ${orderId} fully filled at avg price ${avgPrice}`);
+
+                    return {
+                        success: true,
+                        filled: true,
+                        orderId: order.orderId,
+                        symbol: order.symbol,
+                        side: order.side,
+                        requestedQty: order.qty,
+                        filledQty: order.cumExecQty,
+                        avgFillPrice: avgPrice,
+                        totalValue: order.cumExecValue,
+                        status: status,
+                        partialFill: false,
+                        fillPercent: 100
+                    };
+                }
+
+                // Check if partially filled
+                if (status === 'PartiallyFilled') {
+                    const avgPrice = order.cumExecValue / order.cumExecQty;
+                    const fillPercent = (order.cumExecQty / order.qty) * 100;
+
+                    console.log(`⚠️  Order ${orderId} partially filled: ${fillPercent.toFixed(2)}%`);
+
+                    return {
+                        success: true,
+                        filled: true,
+                        orderId: order.orderId,
+                        symbol: order.symbol,
+                        side: order.side,
+                        requestedQty: order.qty,
+                        filledQty: order.cumExecQty,
+                        avgFillPrice: avgPrice,
+                        totalValue: order.cumExecValue,
+                        status: status,
+                        partialFill: true,
+                        fillPercent: fillPercent
+                    };
+                }
+
+                // Check if order failed
+                if (status === 'Rejected' || status === 'Cancelled') {
+                    console.error(`❌ Order ${orderId} ${status.toLowerCase()}`);
+
+                    return {
+                        success: false,
+                        filled: false,
+                        orderId: order.orderId,
+                        symbol: order.symbol,
+                        status: status,
+                        error: `Order ${status.toLowerCase()}`
+                    };
+                }
+
+                // Still pending, wait and check again
+                await new Promise(resolve => setTimeout(resolve, checkInterval));
+
+            } catch (error) {
+                console.error(`❌ Error checking order status:`, error.message);
+                await new Promise(resolve => setTimeout(resolve, checkInterval));
+            }
+        }
+
+        // Timeout reached
+        console.error(`⏱️  Timeout waiting for order ${orderId} to fill (${maxWaitMs}ms)`);
+
+        return {
+            success: false,
+            filled: false,
+            orderId: orderId,
+            symbol: symbol,
+            error: `Timeout waiting for order fill (${maxWaitMs}ms)`,
+            timeout: true
+        };
+    }
+
+    /**
+     * Calculate slippage between expected and actual price
+     * @param {number} expectedPrice - Expected/signal price
+     * @param {number} actualPrice - Actual execution price
+     * @param {string} side - Order side (Buy/Sell)
+     * @returns {Object} Slippage details
+     */
+    calculateSlippage(expectedPrice, actualPrice, side) {
+        const priceDiff = actualPrice - expectedPrice;
+        const slippagePercent = (priceDiff / expectedPrice) * 100;
+
+        // For Buy: higher price = negative slippage (worse)
+        // For Sell: lower price = negative slippage (worse)
+        const isUnfavorable = (side === 'Buy' && priceDiff > 0) || (side === 'Sell' && priceDiff < 0);
+
+        return {
+            expectedPrice,
+            actualPrice,
+            priceDiff,
+            slippagePercent,
+            slippageBps: slippagePercent * 100, // Basis points
+            isUnfavorable
+        };
     }
 }
 

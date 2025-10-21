@@ -16,7 +16,7 @@ const stripeRoutes = require('./stripe');
 const plansRoutes = require('./plans');
 // const staticPlansRoutes = require('./static-plans'); // File doesn't exist
 // const publicPlansRoutes = require('./public-plans'); // File doesn't exist
-const stripeWebhooksRoutes = require('./stripe-webhooks');
+// const stripeWebhooksRoutes = require('./stripe-webhooks'); // MIGRATED: Merged into stripe.js
 const affiliateRoutes = require('./affiliate');
 const adminRoutes = require('./admin');
 const PerformanceRoutes = require('./performance');
@@ -24,6 +24,7 @@ const OperationsRoutes = require('./operations');
 const TradingViewWebhookRoutes = require('./tradingview-webhook');
 const UserAPIKeysRoutes = require('./user-api-keys');
 const EmergencyMigrationRoute = require('./run-emergency-migration');
+const PositionsRoutes = require('./positions');
 
 // Create auth routes instance
 const authRoutes = new AuthRoutes();
@@ -33,6 +34,7 @@ const operationsRoutes = new OperationsRoutes();
 const tradingViewWebhookRoutes = new TradingViewWebhookRoutes();
 const userAPIKeysRoutes = new UserAPIKeysRoutes();
 const emergencyMigrationRoute = new EmergencyMigrationRoute();
+const positionsRoutes = new PositionsRoutes();
 
 // Function to set database pool manager for all routes
 const setDbPoolManager = (dbPoolManager) => {
@@ -42,7 +44,7 @@ const setDbPoolManager = (dbPoolManager) => {
     plansRoutes.setDbPoolManager(dbPoolManager);
     // staticPlansRoutes.setDbPoolManager(dbPoolManager); // Module not available
     // publicPlansRoutes.setDbPoolManager(dbPoolManager); // Module not available
-    stripeWebhooksRoutes.setDbPoolManager(dbPoolManager);
+    // stripeWebhooksRoutes.setDbPoolManager(dbPoolManager); // MIGRATED: Merged into stripe.js
     userSettingsRoutes.setDbPoolManager(dbPoolManager);
     // userExchangeSettingsRoutes.setDbPoolManager(dbPoolManager); // DEPRECATED: Merged into users.js
     tradingViewWebhookRoutes.setDbPoolManager(dbPoolManager);
@@ -53,10 +55,26 @@ const setDbPoolManager = (dbPoolManager) => {
     emergencyMigrationRoute.setDbPoolManager(dbPoolManager);
     affiliateRoutes.setDbPoolManager(dbPoolManager);
     adminRoutes.setDbPoolManager(dbPoolManager);
+    positionsRoutes.setDbPoolManager(dbPoolManager);
 
     // Connect affiliate service to auth routes for referral tracking
     if (affiliateRoutes.affiliateService) {
         authRoutes.setAffiliateService(affiliateRoutes.affiliateService);
+    }
+};
+
+// Function to set hybrid services for position management
+const setHybridServices = (positionManagementService, reconciliationService) => {
+    if (positionsRoutes && positionsRoutes.setPositionManagementService) {
+        positionsRoutes.setPositionManagementService(positionManagementService);
+        positionsRoutes.setReconciliationService(reconciliationService);
+        console.log('✅ Hybrid services connected to positions routes');
+    }
+
+    // Inject position management service to operations routes
+    if (operationsRoutes && operationsRoutes.realOperationsService) {
+        operationsRoutes.realOperationsService.setPositionManagementService(positionManagementService);
+        console.log('✅ Hybrid services connected to operations routes');
     }
 };
 
@@ -76,16 +94,18 @@ router.get('/status', (req, res) => {
             plans: 'active',
             staticPlans: 'active',
             publicPlans: 'active',
-            stripeWebhooks: 'active',
+            // stripeWebhooks: 'active', // MIGRATED: Merged into stripe.js
             affiliate: 'active',
             admin: 'active',
             performance: 'active',
             operations: 'active',
             tradingViewWebhooks: 'active',
-            userAPIKeys: 'active'
+            userAPIKeys: 'active',
+            positions: 'active'
         },
         tradingMode: 'PERSONAL',
-        note: 'Users must connect their own Bybit/Binance API keys to trade. Users can now set their preferred exchange (Bybit/Binance) via /api/user/settings/exchange'
+        hybridPositionManagement: 'enabled',
+        note: 'Users must connect their own Bybit/Binance API keys to trade. Real-time positions from exchange via /api/positions/*'
     });
 });
 
@@ -163,7 +183,7 @@ router.use('/stripe', stripeRoutes.getRouter());
 router.use('/plans', plansRoutes.getRouter());
 // router.use('/static-plans', staticPlansRoutes.getRouter()); // Module not available
 // router.use('/public-plans', publicPlansRoutes.getRouter()); // Module not available
-router.use('/stripe-webhooks', stripeWebhooksRoutes.getRouter());
+// router.use('/stripe-webhooks', stripeWebhooksRoutes.getRouter()); // MIGRATED: Merged into stripe.js
 router.use('/affiliate', affiliateRoutes.getRouter());
 router.use('/admin', adminRoutes.getRouter());
 router.use('/performance', performanceRoutes.getRouter());
@@ -171,5 +191,6 @@ router.use('/operations', operationsRoutes.getRouter());
 router.use('/tradingview', tradingViewWebhookRoutes.getRouter());
 router.use('/user-api-keys', userAPIKeysRoutes.getRouter());
 router.use('/emergency-migration', emergencyMigrationRoute.getRouter());
+router.use('/positions', positionsRoutes.getRouter());
 
-module.exports = { router, setDbPoolManager };
+module.exports = { router, setDbPoolManager, setHybridServices };

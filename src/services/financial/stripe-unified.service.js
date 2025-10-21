@@ -11,21 +11,34 @@ class StripeUnifiedService {
         this.dbPoolManager = dbPoolManager;
         this.plans = {
             BR: { 
-                monthly: 29700, 
-                recharge_min: 15000, 
+                monthly: 54600, // R$ 546.00 in cents (Brazil) - equivalent to $100 USD
+                recharge_min: 27300, // R$ 273.00 minimum recharge - equivalent to $50 USD
                 currency: 'brl',
-                price: 29700 // R$ 297.00 in cents
+                price: 54600,
+                country: 'BR',
+                countryName: 'Brazil',
+                usdEquivalent: 100.00 // $100 USD equivalent
             },
             US: { 
-                monthly: 5000, 
-                recharge_min: 3000, 
+                monthly: 10000, // $100.00 in cents (International)
+                recharge_min: 5000, // $50.00 minimum recharge
                 currency: 'usd',
-                price: 5000 // $50.00 in cents
+                price: 10000,
+                country: 'US',
+                countryName: 'International',
+                brlEquivalent: 546.00 // R$ 546 BRL equivalent
             }
         };
         this.commissionRates = {
             MONTHLY: 0.10,   // 10% sobre lucro
             PREPAID: 0.20    // 20% sobre lucro
+        };
+        
+        // Exchange rate cache
+        this.exchangeRates = {
+            usdToBrl: 5.46, // Current rate: 1 USD = 5.46 BRL
+            brlToUsd: 0.183, // Current rate: 1 BRL = 0.183 USD
+            lastUpdated: new Date()
         };
         
         console.log('🔥 Stripe Unified Service initialized with database integration');
@@ -44,21 +57,210 @@ class StripeUnifiedService {
     }
 
     /**
+     * Update exchange rates and recalculate pricing
+     */
+    async updateExchangeRates() {
+        try {
+            const axios = require('axios');
+            
+            // Get current exchange rate from a reliable API
+            const response = await axios.get('https://api.exchangerate-api.com/v4/latest/USD', {
+                timeout: 5000
+            });
+            
+            if (response.data && response.data.rates && response.data.rates.BRL) {
+                const newUsdToBrl = response.data.rates.BRL;
+                const newBrlToUsd = 1 / newUsdToBrl;
+                
+                this.exchangeRates = {
+                    usdToBrl: newUsdToBrl,
+                    brlToUsd: newBrlToUsd,
+                    lastUpdated: new Date()
+                };
+                
+                // Update pricing based on new exchange rates
+                this.updatePricingWithExchangeRates();
+                
+                console.log('💱 Exchange rates updated:', {
+                    usdToBrl: newUsdToBrl,
+                    brlToUsd: newBrlToUsd,
+                    lastUpdated: this.exchangeRates.lastUpdated
+                });
+                
+                return true;
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not update exchange rates, using cached rates:', error.message);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Update pricing based on current exchange rates
+     */
+    updatePricingWithExchangeRates() {
+        const baseUsdPrice = 100.00; // Base price in USD
+        const baseUsdRecharge = 50.00; // Base recharge in USD
+        
+        // Calculate BRL prices based on current exchange rate
+        const brlPrice = Math.round(baseUsdPrice * this.exchangeRates.usdToBrl * 100); // Convert to cents
+        const brlRecharge = Math.round(baseUsdRecharge * this.exchangeRates.usdToBrl * 100); // Convert to cents
+        
+        // Update plans with new pricing
+        this.plans.BR.monthly = brlPrice;
+        this.plans.BR.recharge_min = brlRecharge;
+        this.plans.BR.price = brlPrice;
+        this.plans.BR.usdEquivalent = baseUsdPrice;
+        
+        this.plans.US.brlEquivalent = baseUsdPrice * this.exchangeRates.usdToBrl;
+        
+        console.log('💰 Pricing updated with current exchange rates:', {
+            usd: { monthly: baseUsdPrice, recharge: baseUsdRecharge },
+            brl: { monthly: brlPrice / 100, recharge: brlRecharge / 100 },
+            exchangeRate: this.exchangeRates.usdToBrl
+        });
+    }
+
+    /**
+     * Determine user's currency and pricing based on location
+     */
+    async getUserCurrencyAndPricing(userId) {
+        try {
+            if (!this.dbPoolManager) {
+                console.warn('⚠️ Database not available, using default pricing (USD)');
+                return this.plans.US;
+            }
+
+            // Get user's country from database
+            const userResult = await this.dbPoolManager.executeRead(
+                'SELECT country FROM users WHERE id = $1',
+                [userId]
+            );
+
+            let userCountry = null;
+            if (userResult.rows.length > 0) {
+                userCountry = userResult.rows[0].country;
+            }
+
+            // Determine if user is from Brazil
+            const isBrazilian = this.isBrazilianUser(userCountry);
+            const planKey = isBrazilian ? 'BR' : 'US';
+            const plan = this.plans[planKey];
+
+            console.log(`🌍 User ${userId} currency determined:`, {
+                userCountry,
+                isBrazilian,
+                currency: plan.currency,
+                amount: plan.monthly / 100,
+                countryName: plan.countryName
+            });
+
+            return plan;
+        } catch (error) {
+            console.error('❌ Error determining user currency:', error);
+            // Fallback to USD pricing
+            return this.plans.US;
+        }
+    }
+
+    /**
+     * Check if user is from Brazil based on country code
+     */
+    isBrazilianUser(country) {
+        if (!country) {
+            // If no country specified, default to Brazil (as per your requirement)
+            return true;
+        }
+
+        const brazilianCountries = [
+            'BR', 'BRA', 'Brazil', 'brazil', 'BRASIL', 'brasil',
+            'Brasil', 'BRAZIL', 'br', 'bra'
+        ];
+
+        return brazilianCountries.includes(country);
+    }
+
+    /**
+     * Get available payment methods for user's currency
+     */
+    getAvailablePaymentMethods(currency) {
+        // TODO: Enable Boleto in Stripe dashboard for Brazilian users
+        // To enable Boleto:
+        // 1. Go to Stripe Dashboard > Settings > Payment methods
+        // 2. Enable "Boleto" for Brazil
+        // 3. Update this method to return ['card', 'boleto'] for BRL
+        
+        const availableMethods = {
+            'brl': ['card'], // ['card', 'boleto'] when Boleto is enabled
+            'usd': ['card']
+        };
+        
+        return availableMethods[currency] || ['card'];
+    }
+
+    /**
+     * Get user's IP-based location (fallback method)
+     */
+    async getUserLocationFromIP(req) {
+        try {
+            // Try to get country from request headers (if using a proxy/CDN)
+            const countryFromHeader = req.headers['cf-ipcountry'] || 
+                                    req.headers['x-country-code'] || 
+                                    req.headers['x-forwarded-country'];
+
+            if (countryFromHeader) {
+                return countryFromHeader;
+            }
+
+            // Get client IP
+            const clientIP = req.ip || 
+                           req.connection.remoteAddress || 
+                           req.socket.remoteAddress ||
+                           (req.connection.socket ? req.connection.socket.remoteAddress : null);
+
+            if (!clientIP) {
+                return null;
+            }
+
+            // Use a free IP geolocation service
+            const axios = require('axios');
+            const response = await axios.get(`http://ip-api.com/json/${clientIP}`, {
+                timeout: 3000
+            });
+
+            if (response.data && response.data.status === 'success') {
+                return response.data.countryCode;
+            }
+
+            return null;
+        } catch (error) {
+            console.warn('⚠️ Could not determine IP location:', error.message);
+            return null;
+        }
+    }
+
+    /**
      * Create Stripe checkout session for payments or subscriptions
      */
-    async createCheckoutSession(userId, planType, country, amount = null) {
+    async createCheckoutSession(userId, planType, country = null, amount = null, planCode = null, successUrl = null, cancelUrl = null) {
         try {
-            const plan = this.plans[country];
-            const finalAmount = amount || plan.monthly;
+            // Determine user's currency and pricing based on location
+            const userPlan = await this.getUserCurrencyAndPricing(userId);
+            const finalAmount = amount || userPlan.monthly;
             
             const sessionData = {
-                payment_method_types: ['card'],
+                payment_method_types: this.getAvailablePaymentMethods(userPlan.currency),
                 line_items: [{
                     price_data: {
-                        currency: plan.currency,
+                        currency: userPlan.currency,
                         product_data: { 
-                            name: planType === 'monthly' ? 'MarketBot Monthly Plan' : 'MarketBot Recharge',
-                            description: planType === 'monthly' ? 'Monthly subscription' : 'Account recharge'
+                            name: planType === 'monthly' ? 
+                                `MarketBot Monthly Plan - ${userPlan.countryName}` : 
+                                `MarketBot Recharge - ${userPlan.countryName}`,
+                            description: planType === 'monthly' ? 
+                                `Monthly subscription (${userPlan.currency.toUpperCase()})` : 
+                                `Account recharge (${userPlan.currency.toUpperCase()})`
                         },
                         unit_amount: finalAmount,
                         // FIXED: Add recurring configuration for subscription mode
@@ -71,15 +273,19 @@ class StripeUnifiedService {
                     quantity: 1,
                 }],
                 mode: planType === 'monthly' ? 'subscription' : 'payment',
-                success_url: `${process.env.FRONTEND_URL || 'http://localhost:3003'}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3003'}/payment/cancel`,
+                success_url: successUrl || `${process.env.FRONTEND_URL || 'http://localhost:3003'}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: cancelUrl || `${process.env.FRONTEND_URL || 'http://localhost:3003'}/payment/cancel`,
                 metadata: { 
                     userId: userId.toString(), 
                     planType, 
-                    country,
-                    amount: finalAmount.toString()
+                    planCode: planCode || planType,
+                    country: userPlan.country,
+                    currency: userPlan.currency,
+                    amount: finalAmount.toString(),
+                    countryName: userPlan.countryName
                 },
-                customer_email: await this.getUserEmail(userId.toString())
+                customer_email: await this.getUserEmail(userId.toString()),
+                locale: userPlan.currency === 'brl' ? 'pt-BR' : 'en'
             };
 
             const session = await this.stripe.checkout.sessions.create(sessionData);
@@ -89,6 +295,53 @@ class StripeUnifiedService {
         } catch (error) {
             console.error('❌ Error creating checkout session:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Get user's pricing information
+     */
+    async getUserPricingInfo(userId) {
+        try {
+            const userPlan = await this.getUserCurrencyAndPricing(userId);
+            
+            return {
+                currency: userPlan.currency,
+                monthlyPrice: userPlan.monthly / 100, // Convert from cents
+                monthlyPriceCents: userPlan.monthly,
+                rechargeMin: userPlan.recharge_min / 100, // Convert from cents
+                rechargeMinCents: userPlan.recharge_min,
+                country: userPlan.country,
+                countryName: userPlan.countryName,
+                isBrazilian: userPlan.country === 'BR',
+                exchangeRates: {
+                    usdToBrl: this.exchangeRates.usdToBrl,
+                    brlToUsd: this.exchangeRates.brlToUsd,
+                    lastUpdated: this.exchangeRates.lastUpdated
+                },
+                equivalentPrices: {
+                    usd: userPlan.currency === 'brl' ? userPlan.usdEquivalent : userPlan.monthly / 100,
+                    brl: userPlan.currency === 'usd' ? userPlan.brlEquivalent : userPlan.monthly / 100
+                }
+            };
+        } catch (error) {
+            console.error('❌ Error getting user pricing info:', error);
+            // Return default USD pricing
+            return {
+                currency: 'usd',
+                monthlyPrice: 100.00,
+                monthlyPriceCents: 10000,
+                rechargeMin: 50.00,
+                rechargeMinCents: 5000,
+                country: 'US',
+                countryName: 'International',
+                isBrazilian: false,
+                exchangeRates: this.exchangeRates,
+                equivalentPrices: {
+                    usd: 100.00,
+                    brl: 546.00
+                }
+            };
         }
     }
 

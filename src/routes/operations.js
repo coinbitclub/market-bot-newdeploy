@@ -20,7 +20,8 @@ class OperationsRoutes {
      */
     setDbPoolManager(dbPoolManager) {
         this.authMiddleware.setDbPoolManager(dbPoolManager);
-        // RealOperationsService handles its own database connection
+        // Pass database pool manager to RealOperationsService
+        this.realOperationsService.setDbPoolManager(dbPoolManager);
         console.log('✅ OperationsRoutes: Database pool manager set');
     }
 

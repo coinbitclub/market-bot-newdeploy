@@ -166,19 +166,21 @@ class UserAPIKeyManager {
             // Test the API key by fetching account info
             let testResult;
             if (exchange.toLowerCase() === 'bybit') {
-                // Use getAccountBalancence for Bybit (returns account details)
+                // Use getAccountBalance for Bybit (returns account details)
                 testResult = await exchangeService.getAccountBalance();
             } else if (exchange.toLowerCase() === 'binance') {
                 // Use getAccountBalance for Binance
                 testResult = await exchangeService.getAccountBalance();
             }
 
-            if (!testResult || testResult.error) {
+            // Check if the test was successful
+            if (!testResult || !testResult.success) {
+                const errorMessage = testResult?.error || 'API key verification failed';
                 await this.updateAPIKeyStatus(userId, exchange, false, false);
                 await this.logAPIKeyAction(userId, exchange, 'API_KEY_VERIFICATION_FAILED', 'ERROR');
                 return {
                     success: false,
-                    error: 'API key verification failed'
+                    error: errorMessage
                 };
             }
 

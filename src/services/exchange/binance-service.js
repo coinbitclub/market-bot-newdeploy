@@ -182,7 +182,7 @@ class BinanceService {
     async getOpenOrders(symbol = null) {
         try {
             if (!this.hasCredentials) {
-                throw new Error('Binance API credentials not configured');
+                return { success: false, error: 'Binance API credentials not configured' };
             }
             const data = await this.binance.futuresOpenOrders({ symbol: symbol ? symbol.toUpperCase() : undefined });
             const arr = Array.isArray(data) ? data : (data && data.length !== undefined ? data : []);
@@ -201,18 +201,22 @@ class BinanceService {
             }));
         } catch (error) {
             console.error('❌ Error fetching open orders:', error.message);
-            throw error;
+            return [];
         }
     }
 
     async placeOrder(orderParams) {
         try {
             if (!this.hasCredentials) {
-                throw new Error('Binance API credentials not configured');
+                return { success: false, error: 'Binance API credentials not configured' };
             }
             const { symbol, side, orderType = 'Market', qty, quantity, price } = orderParams;
             const actualQty = quantity || qty;
-            if (!actualQty) throw new Error('Quantity (qty) is required for order placement');
+            if (!actualQty) {
+                return { success: false, error: 'Quantity (qty) is required for order placement' };
+            }
+
+            console.log(`🔥 Placing Binance order with params:`, { symbol, side, orderType, qty: actualQty, price });
 
             let data;
             if (orderType.toUpperCase() === 'MARKET') {
@@ -232,8 +236,10 @@ class BinanceService {
                     timeInForce: 'GTC'
                 });
             } else {
-                throw new Error(`Unsupported order type: ${orderType}`);
+                return { success: false, error: `Unsupported order type: ${orderType}` };
             }
+
+            console.log(`✅ Binance order placed successfully: ${data.orderId}`);
 
             return {
                 success: true,
@@ -250,15 +256,18 @@ class BinanceService {
                 timestamp: Date.now()
             };
         } catch (error) {
-            console.error('❌ Error placing order:', error.message);
-            throw error;
+            console.error('❌ Error placing Binance order:', error.message);
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
     async cancelOrder(symbol, orderId) {
         try {
             if (!this.hasCredentials) {
-                throw new Error('Binance API credentials not configured');
+                return { success: false, error: 'Binance API credentials not configured' };
             }
             const data = await this.binance.futuresCancelOrder({ symbol: symbol.toUpperCase(), orderId: String(orderId) });
             return {
@@ -270,8 +279,11 @@ class BinanceService {
                 timestamp: Date.now()
             };
         } catch (error) {
-            console.error('❌ Error canceling order:', error.message);
-            throw error;
+            console.error('❌ Error canceling Binance order:', error.message);
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
@@ -281,7 +293,7 @@ class BinanceService {
             return { timezone: data.timezone, serverTime: data.serverTime, symbols: data.symbols, timestamp: Date.now() };
         } catch (error) {
             console.error('❌ Error fetching exchange info:', error.message);
-            throw error;
+            return { success: false, error: error.message };
         }
     }
 
@@ -293,7 +305,7 @@ class BinanceService {
             }));
         } catch (error) {
             console.error(`❌ Error fetching klines for ${symbol}:`, error.message);
-            throw error;
+            return [];
         }
     }
 
@@ -312,7 +324,21 @@ class BinanceService {
             return { serverTime: data.serverTime || data, timestamp: Date.now() };
         } catch (error) {
             console.error('❌ Error fetching server time:', error.message);
-            throw error;
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getPositions(symbol = null) {
+        try {
+            if (!this.hasCredentials) {
+                return { success: false, error: 'Binance API credentials not configured' };
+            }
+            const data = await this.binance.futuresPositionRisk({ symbol: symbol ? symbol.toUpperCase() : undefined });
+            const positions = Array.isArray(data) ? data : [];
+            return { success: true, data: positions, timestamp: Date.now() };
+        } catch (error) {
+            console.error('❌ Error fetching positions:', error.message);
+            return { success: false, error: error.message };
         }
     }
 }

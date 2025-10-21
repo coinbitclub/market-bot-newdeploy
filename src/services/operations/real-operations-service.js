@@ -1,22 +1,32 @@
 /**
- * 📊 REAL OPERATIONS SERVICE - COINBITCLUB ENTERPRISE
- * Service for real operations data from database and external APIs
+ * 📊 REAL OPERATIONS SERVICE - COINBITCLUB ENTERPRISE (HYBRID)
+ * Service for REAL-TIME operations data from exchanges
+ *
+ * UPDATED: Now uses hybrid position management
+ * - Current positions: FROM EXCHANGE (real-time) ✅
+ * - Historical data: FROM DATABASE (analytics) ✅
+ * - Stop-loss/Take-profit: CALCULATED with real-time prices ✅
  */
 
 const { Pool } = require('pg');
 const BinanceService = require('../exchange/binance-service');
 
 class RealOperationsService {
-    constructor() {
-        // FIXED: Use proper database configuration with fallback to mock mode
-        const dbConfig = this.getDatabaseConfig();
+    constructor(positionManagementService = null, dbPoolManager = null) {
+        // Hybrid Position Management Service (if provided)
+        this.positionManagementService = positionManagementService;
+        this.dbPoolManager = dbPoolManager;
 
-        if (dbConfig) {
-            this.pool = new Pool(dbConfig);
-            console.log('✅ RealOperationsService: Database connection configured');
-        } else {
-            this.pool = null;
-            console.log('⚠️ RealOperationsService: No database config, using mock mode');
+        // Fallback to direct database connection if dbPoolManager not provided
+        if (!this.dbPoolManager) {
+            const dbConfig = this.getDatabaseConfig();
+            if (dbConfig) {
+                this.pool = new Pool(dbConfig);
+                console.log('✅ RealOperationsService: Database connection configured');
+            } else {
+                this.pool = null;
+                console.log('⚠️ RealOperationsService: No database config, using mock mode');
+            }
         }
 
         // Initialize exchange service for real-time prices
@@ -25,23 +35,40 @@ class RealOperationsService {
     }
 
     /**
+     * Set hybrid position management service
+     * Call this after initialization to enable hybrid mode
+     */
+    setPositionManagementService(positionManagementService) {
+        this.positionManagementService = positionManagementService;
+        console.log('✅ RealOperationsService: Hybrid position management enabled');
+    }
+
+    /**
+     * Set database pool manager
+     */
+    setDbPoolManager(dbPoolManager) {
+        this.dbPoolManager = dbPoolManager;
+        console.log('✅ RealOperationsService: Database pool manager set');
+    }
+
+    /**
      * Get database configuration with proper fallbacks
      */
     getDatabaseConfig() {
         // Try different environment variable patterns
-        const connectionString = process.env.DATABASE_URL || 
-                                process.env.POSTGRES_URL || 
+        const connectionString = process.env.DATABASE_URL ||
+                                process.env.POSTGRES_URL ||
                                 process.env.DB_URL;
-        
+
         if (connectionString) {
             // Auto-detect if SSL is needed based on connection string or environment
-            const needsSSL = process.env.NODE_ENV === 'production' || 
+            const needsSSL = process.env.NODE_ENV === 'production' ||
                            connectionString.includes('sslmode=require') ||
                            connectionString.includes('railway.app') ||
                            connectionString.includes('render.com') ||
                            connectionString.includes('supabase.co') ||
                            connectionString.includes('heroku.com');
-            
+
             return {
                 connectionString,
                 ssl: needsSSL ? { rejectUnauthorized: false } : false,
@@ -60,13 +87,13 @@ class RealOperationsService {
 
         if (host && port && database && user && password) {
             // Auto-detect if SSL is needed based on host or environment
-            const needsSSL = process.env.NODE_ENV === 'production' || 
+            const needsSSL = process.env.NODE_ENV === 'production' ||
                            host.includes('railway.app') ||
                            host.includes('render.com') ||
                            host.includes('supabase.co') ||
                            host.includes('heroku.com') ||
                            process.env.DB_SSL === 'true';
-            
+
             return {
                 host,
                 port: parseInt(port),
@@ -168,18 +195,18 @@ class RealOperationsService {
     async getAIDecision(language = 'pt') {
         try {
             const marketIndicators = await this.getMarketIndicators();
-            
+
             // AI decision logic based on market indicators
             let direction = 'LONG';
             let confidence = 50;
             let reasoning = '';
             let marketSentiment = '';
-            
+
             // Fear & Greed based decision
             if (marketIndicators.fearAndGreed <= 25) {
                 direction = 'LONG';
                 confidence = 85;
-                reasoning = language === 'pt' 
+                reasoning = language === 'pt'
                     ? 'Fear extremo + dominância BTC estável + posições short excessivas = oportunidade de compra'
                     : 'Extreme fear + stable BTC dominance + excessive short positions = buying opportunity';
                 marketSentiment = language === 'pt' ? 'RECUPERAÇÃO IMINENTE' : 'IMMINENT RECOVERY';
@@ -212,12 +239,12 @@ class RealOperationsService {
                     : 'Neutral market + favorable technical analysis = long position';
                 marketSentiment = language === 'pt' ? 'LATERAL' : 'SIDEWAYS';
             }
-            
+
             // Adjust confidence based on BTC dominance
             if (marketIndicators.btcDominance > 60) {
                 confidence += 5; // Higher confidence when BTC dominance is high
             }
-            
+
             return {
                 direction,
                 confidence: Math.min(95, confidence),
@@ -225,7 +252,7 @@ class RealOperationsService {
                 timestamp: new Date(),
                 marketSentiment
             };
-            
+
         } catch (error) {
             console.error('❌ Error getting AI decision:', error);
             throw error;
@@ -243,11 +270,11 @@ class RealOperationsService {
             // Real-time signals come ONLY from TradingView webhook via WebSocket
             // This endpoint returns empty array - signals are broadcasted directly to frontend
             // Frontend should listen to WebSocket events: 'trading_signal' and 'signal_update'
-            
+
             console.log(`📡 NOTE: Real-time signals come via WebSocket from TradingView webhook`);
             console.log(`📡 Frontend should listen to: 'trading_signal' and 'signal_update' events`);
             console.log(`📡 No database polling - signals are broadcasted instantly when received`);
-            
+
             // Return empty array - all signals come via WebSocket
             return [];
 
@@ -258,28 +285,134 @@ class RealOperationsService {
     }
 
     /**
-     * REMOVED: broadcastSignalUpdate method
-     * Real-time signals now come directly from TradingView webhook
-     * No need for database-based broadcasting
+     * Calculate stop-loss and take-profit based on real-time price
+     *
+     * @param {string} side - Position side (LONG or SHORT)
+     * @param {number} currentPrice - Current market price (real-time)
+     * @param {number} entryPrice - Original entry price
+     * @returns {Object} Stop-loss and take-profit prices
      */
+    calculateStopLossTakeProfit(side, currentPrice, entryPrice) {
+        // Use current price if available, otherwise entry price
+        const basePrice = currentPrice || entryPrice;
+
+        let stopLoss, takeProfit;
+
+        if (side === 'LONG' || side === 'Buy') {
+            // LONG position
+            stopLoss = Math.round(basePrice * 0.98 * 100) / 100;    // -2% from current price
+            takeProfit = Math.round(basePrice * 1.04 * 100) / 100;  // +4% from current price
+        } else {
+            // SHORT position
+            stopLoss = Math.round(basePrice * 1.02 * 100) / 100;    // +2% from current price
+            takeProfit = Math.round(basePrice * 0.96 * 100) / 100;  // -4% from current price
+        }
+
+        return {
+            stopLoss,
+            takeProfit,
+            riskPercent: 2,
+            rewardPercent: 4,
+            riskRewardRatio: 2,
+            calculatedFrom: currentPrice ? 'current_price' : 'entry_price',
+            calculatedAt: new Date().toISOString()
+        };
+    }
 
     /**
-     * Get real-time positions with live market prices from database
+     * Get real-time positions from EXCHANGE (HYBRID MODE)
+     * Uses position management service for real-time data
      */
     async getPositions(userId) {
         try {
-            console.log(`📡 Fetching OPEN positions for user ${userId} from database...`);
+            console.log(`📡 Fetching REAL-TIME positions for user ${userId}...`);
 
-            if (!this.pool) {
+            // HYBRID MODE: Use position management service if available
+            if (this.positionManagementService) {
+                console.log(`✅ Using HYBRID position management (real-time from exchange)`);
+
+                const positions = await this.positionManagementService.getPositionsForDisplay(userId);
+
+                // Calculate stop-loss/take-profit with real-time prices
+                const enrichedPositions = positions.map(position => {
+                    const sltp = this.calculateStopLossTakeProfit(
+                        position.side,
+                        position.markPrice,  // Real-time price from exchange
+                        position.entryPrice
+                    );
+
+                    return {
+                        id: position.operation_id || `${position.exchange}_${position.symbol}`,
+                        pair: position.symbol,
+                        type: position.side,
+                        entryPrice: position.entryPrice,
+                        currentPrice: position.markPrice,           // ← Real-time from exchange
+                        quantity: position.size,
+                        pnl: position.unrealizedPnl,               // ← Real-time from exchange
+                        pnlPercent: position.unrealizedPnlPercent, // ← Real-time from exchange
+                        status: 'OPEN',
+                        timestamp: position.entry_time || new Date().toISOString(),
+                        stopLoss: sltp.stopLoss,                   // ← Calculated with real-time price
+                        takeProfit: sltp.takeProfit,               // ← Calculated with real-time price
+                        leverage: position.leverage,
+                        marginType: position.marginType,
+                        positionValue: position.positionValue,
+                        liquidationPrice: position.liquidationPrice,
+                        exchange: position.exchange,
+
+                        // Metadata
+                        dataSource: 'exchange',                    // ← Indicates real-time
+                        inSync: position.inSync,
+                        isTracked: position.isTracked,
+                        planType: position.plan_type,
+                        slippage: position.slippage,
+
+                        // SL/TP metadata
+                        sltp: {
+                            calculatedFrom: sltp.calculatedFrom,
+                            riskPercent: sltp.riskPercent,
+                            rewardPercent: sltp.rewardPercent,
+                            riskRewardRatio: sltp.riskRewardRatio
+                        }
+                    };
+                });
+
+                console.log(`✅ Fetched ${enrichedPositions.length} REAL-TIME positions from exchange`);
+                return enrichedPositions;
+            }
+
+            // FALLBACK: Legacy database mode (deprecated)
+            console.warn(`⚠️ FALLBACK: Using legacy database mode (not real-time)`);
+            return await this.getPositionsFromDatabase(userId);
+
+        } catch (error) {
+            console.error('❌ Error fetching positions:', error);
+            return [];
+        }
+    }
+
+    /**
+     * LEGACY: Get positions from database (fallback only)
+     * @deprecated Use getPositions() with hybrid mode instead
+     */
+    async getPositionsFromDatabase(userId) {
+        try {
+            console.log(`📡 FALLBACK: Fetching positions from database (not real-time)...`);
+
+            const pool = this.dbPoolManager ?
+                { query: (...args) => this.dbPoolManager.executeRead(...args) } :
+                this.pool;
+
+            if (!pool) {
                 console.log('⚠️ No database connection, returning empty positions');
                 return [];
             }
 
             // Query OPEN positions from trading_operations table
-            const result = await this.pool.query(`
+            const result = await pool.query(`
                 SELECT
                     id,
-                    position_id,
+                    operation_id,
                     symbol as pair,
                     operation_type as type,
                     entry_price as "entryPrice",
@@ -304,51 +437,51 @@ class RealOperationsService {
                     // Get real-time current price
                     const priceData = await this.binanceService.getSymbolPrice(row.pair);
 
+                    let currentPrice = row.entryPrice;
                     if (priceData.success) {
-                        const currentPrice = priceData.price;
-
-                        // Calculate real-time P&L
-                        const priceDiff = currentPrice - row.entryPrice;
-                        const pnlPercent = (priceDiff / row.entryPrice) * 100;
-                        const pnl = priceDiff * row.quantity;
-
-                        positions.push({
-                            id: row.id,
-                            pair: row.pair,
-                            type: row.type,
-                            entryPrice: parseFloat(row.entryPrice),
-                            currentPrice: currentPrice,
-                            quantity: parseFloat(row.quantity),
-                            pnl: pnl,
-                            pnlPercent: pnlPercent,
-                            status: row.status,
-                            timestamp: row.timestamp,
-                            stopLoss: parseFloat(row.stopLoss),
-                            takeProfit: parseFloat(row.takeProfit)
-                        });
-                    } else {
-                        // If can't get current price, use entry price
-                        positions.push({
-                            id: row.id,
-                            pair: row.pair,
-                            type: row.type,
-                            entryPrice: parseFloat(row.entryPrice),
-                            currentPrice: parseFloat(row.entryPrice),
-                            quantity: parseFloat(row.quantity),
-                            pnl: 0,
-                            pnlPercent: 0,
-                            status: row.status,
-                            timestamp: row.timestamp,
-                            stopLoss: parseFloat(row.stopLoss),
-                            takeProfit: parseFloat(row.takeProfit)
-                        });
+                        currentPrice = priceData.price;
                     }
+
+                    // Calculate real-time P&L
+                    const priceDiff = currentPrice - row.entryPrice;
+                    const pnlPercent = (priceDiff / row.entryPrice) * 100;
+                    const pnl = priceDiff * row.quantity;
+
+                    // Calculate SL/TP with real-time price
+                    const sltp = this.calculateStopLossTakeProfit(
+                        row.type,
+                        currentPrice,
+                        row.entryPrice
+                    );
+
+                    positions.push({
+                        id: row.operation_id || row.id,
+                        pair: row.pair,
+                        type: row.type,
+                        entryPrice: parseFloat(row.entryPrice),
+                        currentPrice: currentPrice,
+                        quantity: parseFloat(row.quantity),
+                        pnl: pnl,
+                        pnlPercent: pnlPercent,
+                        status: row.status,
+                        timestamp: row.timestamp,
+                        stopLoss: sltp.stopLoss,
+                        takeProfit: sltp.takeProfit,
+                        leverage: row.leverage,
+                        exchange: row.exchange,
+                        dataSource: 'database',  // ← Indicates legacy mode
+                        sltp: {
+                            calculatedFrom: sltp.calculatedFrom,
+                            riskPercent: sltp.riskPercent,
+                            rewardPercent: sltp.rewardPercent
+                        }
+                    });
                 } catch (priceError) {
                     console.error(`Error fetching price for ${row.pair}:`, priceError.message);
                 }
             }
 
-            console.log(`✅ Fetched ${positions.length} OPEN positions from database`);
+            console.log(`✅ Fetched ${positions.length} positions from database (legacy mode)`);
             return positions;
 
         } catch (error) {
@@ -358,22 +491,20 @@ class RealOperationsService {
     }
 
     /**
-     * Get today's statistics only from database
+     * Get today's statistics from database
      * Focused on daily performance metrics
      */
     async getDailyStats(userId) {
         try {
             console.log(`📡 Fetching TODAY'S stats for user ${userId} from database...`);
 
-            if (!this.pool) {
+            const pool = this.dbPoolManager ?
+                { query: (...args) => this.dbPoolManager.executeRead(...args) } :
+                this.pool;
+
+            if (!pool) {
                 console.log('⚠️ No database connection, returning default stats');
-                return {
-                    operationsToday: 0,
-                    successRate: 0,
-                    todayReturnUSD: 0,
-                    todayReturnPercent: 0,
-                    totalInvested: 10000
-                };
+                return this.getDefaultDailyStats();
             }
 
             // Set today's date range
@@ -385,7 +516,7 @@ class RealOperationsService {
             console.log(`📅 Today's range: ${today.toISOString()} to ${tomorrow.toISOString()}`);
 
             // Calculate today's stats from trading_operations
-            const todayResult = await this.pool.query(`
+            const todayResult = await pool.query(`
                 SELECT
                     COUNT(*) as operations_count,
                     COUNT(CASE WHEN profit_loss_usd > 0 THEN 1 END) as winning_ops,
@@ -404,7 +535,7 @@ class RealOperationsService {
             `, [userId, today, tomorrow]);
 
             // Get today's open positions for additional context
-            const openPositionsResult = await this.pool.query(`
+            const openPositionsResult = await pool.query(`
                 SELECT
                     COUNT(*) as open_positions,
                     COALESCE(SUM(quantity * entry_price), 0) as open_value
@@ -455,7 +586,7 @@ class RealOperationsService {
                 todayReturnUSD: Math.round(todayPnL * 100) / 100,
                 todayReturnPercent: Math.round(todayReturnPercent * 100) / 100,
                 totalInvested,
-                
+
                 // Detailed metrics
                 winningTrades: winningToday,
                 losingTrades: losingToday,
@@ -465,12 +596,12 @@ class RealOperationsService {
                 avgPnL: Math.round(avgPnL * 100) / 100,
                 totalVolume: Math.round(totalVolume * 100) / 100,
                 openValue: Math.round(openValue * 100) / 100,
-                
+
                 // Calculated ratios
                 avgWin: Math.round(avgWin * 100) / 100,
                 avgLoss: Math.round(avgLoss * 100) / 100,
                 profitFactor: avgLoss > 0 ? Math.round((avgWin / avgLoss) * 100) / 100 : 0,
-                
+
                 // Timestamps
                 date: today.toISOString().split('T')[0], // YYYY-MM-DD format
                 lastUpdated: new Date().toISOString()
@@ -486,31 +617,38 @@ class RealOperationsService {
 
         } catch (error) {
             console.error('❌ Error fetching today\'s stats from database:', error);
-            return {
-                operationsToday: 0,
-                closedOperations: 0,
-                openPositions: 0,
-                successRate: 0,
-                winRate: 0,
-                lossRate: 0,
-                todayReturnUSD: 0,
-                todayReturnPercent: 0,
-                totalInvested: 10000,
-                winningTrades: 0,
-                losingTrades: 0,
-                neutralTrades: 0,
-                bestTrade: 0,
-                worstTrade: 0,
-                avgPnL: 0,
-                totalVolume: 0,
-                openValue: 0,
-                avgWin: 0,
-                avgLoss: 0,
-                profitFactor: 0,
-                date: new Date().toISOString().split('T')[0],
-                lastUpdated: new Date().toISOString()
-            };
+            return this.getDefaultDailyStats();
         }
+    }
+
+    /**
+     * Get default daily stats (fallback)
+     */
+    getDefaultDailyStats() {
+        return {
+            operationsToday: 0,
+            closedOperations: 0,
+            openPositions: 0,
+            successRate: 0,
+            winRate: 0,
+            lossRate: 0,
+            todayReturnUSD: 0,
+            todayReturnPercent: 0,
+            totalInvested: 10000,
+            winningTrades: 0,
+            losingTrades: 0,
+            neutralTrades: 0,
+            bestTrade: 0,
+            worstTrade: 0,
+            avgPnL: 0,
+            totalVolume: 0,
+            openValue: 0,
+            avgWin: 0,
+            avgLoss: 0,
+            profitFactor: 0,
+            date: new Date().toISOString().split('T')[0],
+            lastUpdated: new Date().toISOString()
+        };
     }
 
     /**
@@ -538,103 +676,6 @@ class RealOperationsService {
             },
             note: 'Signals now come via WebSocket real-time from TradingView alerts'
         };
-
-        /* DISABLED: Mock signal generation - commented out
-        try {
-            const cryptoPairs = [
-                'BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'MATICUSDT', 'DOTUSDT',
-                'LINKUSDT', 'UNIUSDT', 'AVAXUSDT', 'ATOMUSDT', 'FTMUSDT', 'ALGOUSDT',
-                'XRPUSDT', 'DOGEUSDT', 'LTCUSDT', 'BCHUSDT', 'TRXUSDT', 'EOSUSDT',
-                'XLMUSDT', 'VETUSDT', 'FILUSDT', 'ICPUSDT', 'THETAUSDT', 'AAVEUSDT'
-            ];
-
-            const reasonings = [
-                'Breakout confirmado + volume alto',
-                'Suporte testado com sucesso',
-                'Resistência quebrada + momentum',
-                'Padrão de reversão detectado',
-                'Divergência bullish confirmada',
-                'Volume crescente + breakout',
-                'Média móvel cruzou para cima',
-                'RSI em oversold + reversão',
-                'Fibonacci retracement + bounce',
-                'Canal ascendente + breakout'
-            ];
-
-            const pair = cryptoPairs[Math.floor(Math.random() * cryptoPairs.length)];
-            const direction = Math.random() > 0.5 ? 'LONG' : 'SHORT';
-            const strength = Math.floor(Math.random() * 40) + 40; // 40-80
-            const confidence = Math.floor(Math.random() * 30) + 50; // 50-80
-            const reasoning = reasonings[Math.floor(Math.random() * reasonings.length)];
-            const status = Math.random() > 0.3 ? 'PROCESSANDO' : 'APROVADO';
-
-            // FIXED: Check if database connection is available
-            if (!this.pool) {
-                console.log('⚠️ No database connection, returning mock signal');
-                return {
-                    id: `MOCK_${Date.now()}`,
-                    pair,
-                    direction,
-                    confidence,
-                    reasoning,
-                    status: 'MOCK_SIGNAL',
-                    timestamp: new Date().toISOString()
-                };
-            }
-
-            // Create new signal in database
-            const result = await this.pool.query(`
-                INSERT INTO trading_operations (
-                    user_id, signal_id, symbol, operation_type, 
-                    entry_price, quantity, status, entry_time,
-                    exchange, side
-                ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-                ) RETURNING id
-            `, [
-                userId,
-                `SIGNAL_${Date.now()}`,
-                pair,
-                direction,
-                0, // entry_price (will be filled when executed)
-                0, // quantity (will be filled when executed)
-                'SIGNAL_GENERATED',
-                new Date(),
-                'binance', // default exchange
-                direction === 'BUY' ? 'LONG' : 'SHORT' // side
-            ]);
-
-            return {
-                id: result.rows[0].id.toString(),
-                pair,
-                direction,
-                strength,
-                confidence,
-                timestamp: new Date(),
-                status,
-                reasoning
-            };
-
-        } catch (error) {
-            // Handle specific database errors
-            if (error.code === '42P01') {
-                console.log('⚠️ Table "trading_operations" does not exist, returning mock signal');
-            } else {
-                console.error('❌ Error generating new signal:', error);
-            }
-            // Fallback to mock signal if database fails
-            return {
-                id: `MOCK_${Date.now()}`,
-                pair,
-                direction,
-                strength,
-                confidence,
-                timestamp: new Date(),
-                status: 'SIGNAL_GENERATED',
-                reasoning: 'Mock signal - database table not available'
-            };
-        }
-        END OF COMMENTED CODE */
     }
 
     /**
@@ -668,7 +709,9 @@ class RealOperationsService {
      * Close database connection
      */
     async close() {
-        await this.pool.end();
+        if (this.pool) {
+            await this.pool.end();
+        }
     }
 }
 

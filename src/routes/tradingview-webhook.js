@@ -418,7 +418,9 @@ class TradingViewWebhookRoutes {
 
         // Validate operation if provided (custom field)
         if (webhookData.operation) {
-            const validOperations = ['OPEN_POSITION', 'CLOSE_POSITION', 'CLOSE_POSITION_EMA21'];
+            const validOperations = [
+                'OPEN_LONG', 'OPEN_SHORT', 'CLOSE_LONG', 'CLOSE_SHORT',  // Standard 4 operations
+            ];
             if (webhookData.operation.includes('/') || webhookData.operation.includes('{{')) {
                 errors.push(`Operation contains placeholder text: "${webhookData.operation}". Use one of: ${validOperations.join(', ')}`);
             } else if (!validOperations.includes(webhookData.operation)) {

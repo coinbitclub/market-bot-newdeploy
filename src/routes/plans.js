@@ -6,6 +6,7 @@
 const express = require('express');
 const AuthMiddleware = require('../middleware/auth');
 const PlanValidator = require('../services/user-config-manager/plan-validator');
+const UpdatedPlanValidator = require('../services/user-config-manager/plan-validator-updated');
 const StripeUnifiedService = require('../services/financial/stripe-unified.service');
 
 class PlansRoutes {
@@ -13,6 +14,7 @@ class PlansRoutes {
         this.router = express.Router();
         this.authMiddleware = new AuthMiddleware();
         this.planValidator = null;
+        this.updatedPlanValidator = null;
         this.stripeService = new StripeUnifiedService();
         this.setupRoutes();
     }
@@ -23,6 +25,7 @@ class PlansRoutes {
     setDbPoolManager(dbPoolManager) {
         this.authMiddleware.setDbPoolManager(dbPoolManager);
         this.planValidator = new PlanValidator(dbPoolManager);
+        this.updatedPlanValidator = new UpdatedPlanValidator(dbPoolManager);
         this.stripeService.setDbPoolManager(dbPoolManager);
     }
 
@@ -137,7 +140,7 @@ class PlansRoutes {
             const isBrazilian = userCountry === 'BR' || userCountry === 'brazil' || userCountry === null;
             const userRegion = isBrazilian ? 'brazil' : 'international';
             
-            // Get plans from database - filter by user's region + always include TRIAL
+            // Get ALL plans from database - return all active plans regardless of region
             const plansResult = await this.authMiddleware.dbPoolManager.executeRead(
                 `SELECT
                     id,
@@ -154,18 +157,17 @@ class PlansRoutes {
                     is_popular as "isPopular",
                     is_recommended as "isRecommended",
                     stripe_product_id as "stripeProductId",
-                    region
+                    region,
+                    allows_realtime_trading,
+                    requires_user_assets,
+                    transaction_fee_type,
+                    monthly_fee
                 FROM plans
                 WHERE is_active = true
-                AND (
-                    region = $1 
-                    OR code = 'TRIAL'
-                )
                 ORDER BY 
                     CASE WHEN code = 'TRIAL' THEN 0 ELSE 1 END,
                     type, 
-                    price`,
-                [userRegion]
+                    price`
             );
 
             const plans = {
@@ -180,8 +182,13 @@ class PlansRoutes {
                     // Add current plan status
                     isCurrentPlan: userCurrentPlan && plan.code === userCurrentPlan.plan_type,
                     isActive: userCurrentPlan && plan.code === userCurrentPlan.plan_type && userCurrentPlan.subscription_status === 'active',
-                    // Add purchase status
-                    canPurchase: !(userCurrentPlan && plan.code === userCurrentPlan.plan_type)
+                    // Add purchase status - allow purchase if not current plan
+                    canPurchase: !(userCurrentPlan && plan.code === userCurrentPlan.plan_type),
+                    // Add business logic fields
+                    allowsRealtimeTrading: plan.allows_realtime_trading,
+                    requiresUserAssets: plan.requires_user_assets,
+                    transactionFeeType: plan.transaction_fee_type,
+                    monthlyFee: plan.monthly_fee
                 }))
             };
 
@@ -191,7 +198,7 @@ class PlansRoutes {
 
             // Fallback to hardcoded plans if database fails
             console.warn('🔄 Database failed, using fallback plans');
-            const fallbackPlans = await this.getFallbackPlans(region, userId);
+            const fallbackPlans = await this.getFallbackPlans(userRegion, userId);
             res.json(fallbackPlans);
         }
     }
@@ -362,7 +369,9 @@ class PlansRoutes {
     async subscribeToPlan(req, res) {
         try {
             const userId = req.user.id;
-            const { planCode, successUrl, cancelUrl } = req.body;
+            const { planCode, paymentMethod = 'stripe', successUrl, cancelUrl } = req.body;
+
+            console.log(`🛒 User ${userId} attempting to subscribe to plan: ${planCode} with payment method: ${paymentMethod}`);
 
             // Get plan from database
             let planData;
@@ -375,80 +384,294 @@ class PlansRoutes {
                 if (planResult.rows.length === 0) {
                     return res.status(400).json({
                         success: false,
-                        error: 'Código de plano inválido'
+                        error: 'Plano não encontrado ou inativo'
                     });
                 }
 
                 planData = planResult.rows[0];
+                console.log(`📋 Plan found: ${planData.name} (${planData.type})`);
             } catch (error) {
-                console.warn('Database error, using fallback validation');
-                const validPlans = ['TRIAL', 'FLEX_BR', 'PRO_BR', 'FLEX_US', 'PRO_US'];
-                if (!validPlans.includes(planCode)) {
-                    return res.status(400).json({
-                        success: false,
-                        error: 'Código de plano inválido'
-                    });
-                }
+                console.error('Database error getting plan:', error);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Erro ao buscar informações do plano'
+                });
             }
 
-            // For free plans (TRIAL, FLEX), just update user plan directly
-            if (planCode === 'TRIAL' || planCode.includes('FLEX')) {
-                try {
-                    await this.authMiddleware.dbPoolManager.executeWrite(
-                        `UPDATE users SET
-                         plan_type = $1,
-                         subscription_status = 'active',
-                         subscription_start_date = NOW(),
-                         updated_at = NOW()
-                         WHERE id = $2`,
-                        [planCode, userId]
-                    );
-
-                    return res.json({
-                        success: true,
-                        message: 'Plano ativado com sucesso!',
-                        planCode,
-                        checkoutUrl: '#mock-checkout-success'
-                    });
-                } catch (dbError) {
-                    console.error('Database update error:', dbError);
-                    return res.json({
-                        success: true,
-                        message: 'Plano ativado com sucesso! (mock)',
-                        planCode,
-                        checkoutUrl: '#mock-checkout-success'
-                    });
-                }
-            }
-
-            // For paid plans, create Stripe checkout session
-            const isMonthly = planCode.includes('PRO');
-            const isBrazil = planCode.includes('BR');
-            const planType = isMonthly ? 'monthly' : 'prepaid';
-            const country = isBrazil ? 'BR' : 'US';
-
-            // Create Stripe checkout session
-            const session = await this.stripeService.createCheckoutSession(
-                userId,
-                planType,
-                country,
-                null, // price will be determined by plan type
-                successUrl,
-                cancelUrl
+            // Get user's current balance for validation
+            const userResult = await this.authMiddleware.dbPoolManager.executeRead(
+                `SELECT 
+                    balance_real_brl, balance_real_usd,
+                    balance_admin_brl, balance_admin_usd,
+                    plan_type
+                FROM users WHERE id = $1`,
+                [userId]
             );
 
-            res.json({
-                success: true,
-                checkoutUrl: session.url,
-                sessionId: session.id,
-                planCode
-            });
+            if (userResult.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Usuário não encontrado'
+                });
+            }
+
+            const userData = userResult.rows[0];
+            // Convert BRL to USD (approximate rate 1 USD = 5 BRL) and sum all balances
+            const brlToUsdRate = 0.2; // 1 BRL = 0.2 USD (approximate)
+            const userBalance = (parseFloat(userData.balance_real_brl || 0) * brlToUsdRate) + 
+                               parseFloat(userData.balance_real_usd || 0) + 
+                               (parseFloat(userData.balance_admin_brl || 0) * brlToUsdRate) + 
+                               parseFloat(userData.balance_admin_usd || 0);
+
+            console.log(`💰 User balance: $${userBalance.toFixed(2)}`);
+
+            // Handle different plan types
+            if (planCode === 'TRIAL') {
+                // TRIAL plan - free activation
+                return await this.activateTrialPlan(userId, planCode, res);
+            } 
+            else if (planCode.includes('FLEX')) {
+                // FLEX plan - requires minimum $20 assets
+                return await this.activateFlexPlan(userId, planCode, planData, userBalance, paymentMethod, successUrl, cancelUrl, res);
+            } 
+            else if (planCode.includes('PRO')) {
+                // PRO plan - $100/month, can use assets or Stripe
+                return await this.activateProPlan(userId, planCode, planData, userBalance, paymentMethod, successUrl, cancelUrl, res);
+            } 
+            else {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Tipo de plano não suportado'
+                });
+            }
 
         } catch (error) {
             console.error('❌ Error subscribing to plan:', error);
             res.status(500).json({
                 success: false,
                 error: error.message
+            });
+        }
+    }
+
+    /**
+     * Activate TRIAL plan (free)
+     */
+    async activateTrialPlan(userId, planCode, res) {
+        try {
+            await this.authMiddleware.dbPoolManager.executeWrite(
+                `UPDATE users SET
+                 plan_type = $1,
+                 subscription_status = 'active',
+                 subscription_start_date = NOW(),
+                 updated_at = NOW()
+                 WHERE id = $2`,
+                [planCode, userId]
+            );
+
+            console.log(`✅ TRIAL plan activated for user ${userId}`);
+
+            return res.json({
+                success: true,
+                message: 'Plano TRIAL ativado com sucesso!',
+                planCode,
+                planName: 'Trial Plan',
+                paymentRequired: false,
+                checkoutUrl: null
+            });
+        } catch (error) {
+            console.error('Error activating TRIAL plan:', error);
+            return res.status(500).json({
+                success: false,
+                error: 'Erro ao ativar plano TRIAL'
+            });
+        }
+    }
+
+    /**
+     * Activate FLEX plan (requires $20 minimum assets)
+     */
+    async activateFlexPlan(userId, planCode, planData, userBalance, paymentMethod, successUrl, cancelUrl, res) {
+        const minimumAssets = parseFloat(planData.minimum_balance) || 20; // Use database value or default to $20
+
+        if (userBalance >= minimumAssets) {
+            // User has sufficient assets - activate directly
+            try {
+                await this.authMiddleware.dbPoolManager.executeWrite(
+                    `UPDATE users SET
+                     plan_type = $1,
+                     subscription_status = 'active',
+                     subscription_start_date = NOW(),
+                     updated_at = NOW()
+                     WHERE id = $2`,
+                    [planCode, userId]
+                );
+
+                console.log(`✅ FLEX plan activated for user ${userId} with sufficient assets`);
+
+                return res.json({
+                    success: true,
+                    message: 'Plano FLEX ativado com sucesso!',
+                    planCode,
+                    planName: planData.name,
+                    paymentRequired: false,
+                    checkoutUrl: null
+                });
+            } catch (error) {
+                console.error('Error activating FLEX plan:', error);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Erro ao ativar plano FLEX'
+                });
+            }
+        } else {
+            // User needs to deposit more assets
+            const requiredAmount = minimumAssets - userBalance;
+            
+            if (paymentMethod === 'stripe') {
+                // Create Stripe checkout for asset deposit
+                try {
+                    const session = await this.stripeService.createCheckoutSession(
+                        userId,
+                        'asset_deposit',
+                        null, // Country will be determined by user's location
+                        requiredAmount,
+                        planCode, // FIXED: Pass planCode to Stripe service
+                        successUrl,
+                        cancelUrl
+                    );
+
+                    return res.json({
+                        success: true,
+                        message: `FLEX plan requer $${minimumAssets} em ativos. Você tem $${userBalance.toFixed(2)}. Deposite $${requiredAmount.toFixed(2)} para ativar.`,
+                        planCode,
+                        planName: planData.name,
+                        paymentRequired: true,
+                        requiredAmount: requiredAmount,
+                        currentBalance: userBalance,
+                        minimumRequired: minimumAssets,
+                        checkoutUrl: session.url,
+                        sessionId: session.id
+                    });
+                } catch (error) {
+                    console.error('Error creating Stripe session for FLEX:', error);
+                    return res.status(500).json({
+                        success: false,
+                        error: 'Erro ao criar sessão de pagamento'
+                    });
+                }
+            } else {
+                // Return requirement info
+                return res.json({
+                    success: false,
+                    message: `FLEX plan requer $${minimumAssets} em ativos. Você tem $${userBalance.toFixed(2)}.`,
+                    planCode,
+                    planName: planData.name,
+                    paymentRequired: true,
+                    requiredAmount: requiredAmount,
+                    currentBalance: userBalance,
+                    minimumRequired: minimumAssets,
+                    checkoutUrl: null
+                });
+            }
+        }
+    }
+
+    /**
+     * Activate PRO plan ($100/month)
+     */
+    async activateProPlan(userId, planCode, planData, userBalance, paymentMethod, successUrl, cancelUrl, res) {
+        const monthlyFee = parseFloat(planData.monthly_fee) || parseFloat(planData.price) || 100; // Use database value or default to $100
+
+        if (paymentMethod === 'assets' && userBalance >= monthlyFee) {
+            // User wants to pay with assets and has sufficient balance
+            try {
+                // Deduct from user's balance based on plan currency
+                const isBrazilianPlan = planCode.includes('BR');
+                const balanceField = isBrazilianPlan ? 'balance_real_brl' : 'balance_real_usd';
+                
+                await this.authMiddleware.dbPoolManager.executeWrite(
+                    `UPDATE users SET
+                     plan_type = $1,
+                     subscription_status = 'active',
+                     subscription_start_date = NOW(),
+                     subscription_end_date = NOW() + INTERVAL '1 month',
+                     ${balanceField} = ${balanceField} - $2,
+                     updated_at = NOW()
+                     WHERE id = $3`,
+                    [planCode, monthlyFee, userId]
+                );
+
+                console.log(`✅ PRO plan activated for user ${userId} with assets payment`);
+
+                return res.json({
+                    success: true,
+                    message: 'Plano PRO ativado com sucesso! Pago com ativos.',
+                    planCode,
+                    planName: planData.name,
+                    paymentRequired: false,
+                    paymentMethod: 'assets',
+                    amountPaid: monthlyFee,
+                    checkoutUrl: null
+                });
+            } catch (error) {
+                console.error('Error activating PRO plan with assets:', error);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Erro ao ativar plano PRO com ativos'
+                });
+            }
+        } else if (paymentMethod === 'stripe') {
+            // User wants to pay with Stripe
+            try {
+                const session = await this.stripeService.createCheckoutSession(
+                    userId,
+                    'monthly',
+                    null, // Country will be determined by user's location
+                    monthlyFee,
+                    planCode, // FIXED: Pass planCode to Stripe service
+                    successUrl,
+                    cancelUrl
+                );
+
+                return res.json({
+                    success: true,
+                    message: 'Redirecionando para pagamento Stripe...',
+                    planCode,
+                    planName: planData.name,
+                    paymentRequired: true,
+                    paymentMethod: 'stripe',
+                    amount: monthlyFee,
+                    checkoutUrl: session.url,
+                    sessionId: session.id
+                });
+            } catch (error) {
+                console.error('Error creating Stripe session for PRO:', error);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Erro ao criar sessão de pagamento'
+                });
+            }
+        } else {
+            // Return payment options
+            return res.json({
+                success: false,
+                message: 'Escolha um método de pagamento para o plano PRO',
+                planCode,
+                planName: planData.name,
+                paymentRequired: true,
+                paymentOptions: {
+                    assets: {
+                        available: userBalance >= monthlyFee,
+                        amount: monthlyFee,
+                        currentBalance: userBalance
+                    },
+                    stripe: {
+                        available: true,
+                        amount: monthlyFee
+                    }
+                },
+                checkoutUrl: null
             });
         }
     }

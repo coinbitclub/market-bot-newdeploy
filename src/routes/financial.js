@@ -200,11 +200,11 @@ class FinancialRoutes {
             }
 
             // Create Stripe checkout session for balance recharge
-            const country = currency === 'BRL' ? 'BR' : 'US';
+            // Currency will be determined by user's location, not by the currency parameter
             const amountInCents = Math.round(amount * 100); // Convert to cents
 
             const session = await this.stripeService.createCheckoutSession(
-                userId, 'recharge', country, amountInCents
+                userId, 'recharge', null, amountInCents, 'RECHARGE'
             );
 
             res.json({

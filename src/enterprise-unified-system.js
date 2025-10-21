@@ -7,11 +7,17 @@ const express = require('express');
 const http = require('http');
 const morgan = require('morgan');
 
-const { router: ApiRoutes, setDbPoolManager } = require('./routes/index');
+const { router: ApiRoutes, setDbPoolManager, setHybridServices } = require('./routes/index');
 const ConnectionPoolManager = require('./database/connection-pool-manager');
 const tradingWebSocket = require('./services/websocket/trading-websocket');
 const { SecurityConfig } = require('./core/security');
 const { ErrorHandler } = require('./middleware/error-handler');
+
+// Hybrid Position Management Services
+const PositionManagementService = require('./services/position/position-management-service');
+const PositionReconciliationService = require('./services/position/position-reconciliation-service');
+const RealOperationsService = require('./services/operations/real-operations-service');
+const UserApiKeyManager = require('./services/user-api-keys/user-api-key-manager');
 
 class CoinBitClubEnterpriseSystem {
     constructor() {
@@ -30,12 +36,61 @@ class CoinBitClubEnterpriseSystem {
         // Set database pool manager for auth routes
         setDbPoolManager(this.dbPoolManager);
 
+        // Initialize hybrid position management services
+        this.initializeHybridServices();
+
         this.setupMiddleware();
         this.setupRoutes();
         this.setupErrorHandling();
         this.setupWebSocket();
         this.setupProcessErrorHandlers();
         console.log('🏗️ CoinBitClub Enterprise System started');
+    }
+
+    initializeHybridServices() {
+        try {
+            console.log('🔄 Initializing hybrid position management services...');
+
+            // Initialize User API Key Manager
+            this.apiKeyManager = new UserApiKeyManager(this.dbPoolManager);
+            console.log('✅ User API Key Manager initialized');
+
+            // Initialize Position Management Service (hybrid: exchange + database)
+            this.positionManagementService = new PositionManagementService(
+                this.dbPoolManager,
+                this.apiKeyManager
+            );
+            console.log('✅ Position Management Service initialized (hybrid mode)');
+
+            // Initialize Real Operations Service with hybrid support
+            this.realOperationsService = new RealOperationsService(
+                this.positionManagementService,
+                this.dbPoolManager
+            );
+            console.log('✅ Real Operations Service initialized with real-time data');
+
+            // Initialize Position Reconciliation Service (auto-sync every 5 min)
+            this.reconciliationService = new PositionReconciliationService(
+                this.dbPoolManager,
+                this.positionManagementService,
+                tradingWebSocket
+            );
+            console.log('✅ Position Reconciliation Service initialized');
+
+            // Make services available globally to routes
+            this.app.set('positionManagementService', this.positionManagementService);
+            this.app.set('realOperationsService', this.realOperationsService);
+            this.app.set('reconciliationService', this.reconciliationService);
+            this.app.set('apiKeyManager', this.apiKeyManager);
+
+            // Inject hybrid services into routes
+            setHybridServices(this.positionManagementService, this.reconciliationService);
+
+            console.log('🎯 Hybrid position management ready - real-time data enabled');
+        } catch (error) {
+            console.error('❌ Error initializing hybrid services:', error.message);
+            console.warn('⚠️  System will run without hybrid position management');
+        }
     }
 
     setupMiddleware() {
@@ -167,26 +222,37 @@ class CoinBitClubEnterpriseSystem {
         });
     }
 
-    async gracefulShutdown(exitCode = 0) {        
+    async gracefulShutdown(exitCode = 0) {
+        console.log('🛑 Starting graceful shutdown...');
 
         try {
+            // Stop reconciliation service
+            if (this.reconciliationService) {
+                this.reconciliationService.stop();
+                console.log('✅ Reconciliation service stopped');
+            }
+
             // Stop accepting new connections
             if (this.server) {
                 await new Promise((resolve) => {
                     this.server.close(resolve);
                 });
+                console.log('✅ HTTP server closed');
             }
 
             // Close database connections
             if (this.dbPoolManager) {
                 await this.dbPoolManager.closeAll();
+                console.log('✅ Database connections closed');
             }
 
             // Close WebSocket connections
             if (tradingWebSocket && tradingWebSocket.io) {
                 tradingWebSocket.io.close();
+                console.log('✅ WebSocket connections closed');
             }
 
+            console.log('✅ Graceful shutdown complete');
             process.exit(exitCode);
 
         } catch (error) {
@@ -212,6 +278,12 @@ class CoinBitClubEnterpriseSystem {
         try {
             this.server = this.httpServer.listen(this.port, () => {
                 this.dbPoolManager.startHealthChecks();
+
+                // Start position reconciliation service (auto-sync every 5 min)
+                if (this.reconciliationService) {
+                    this.reconciliationService.start();
+                    console.log('🔄 Position reconciliation service started (auto-sync enabled)');
+                }
             });
 
             return this.server;

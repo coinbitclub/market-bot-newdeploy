@@ -91,7 +91,7 @@ class UnifiedExchangeService {
                 const bybitInfo = await this.bybitService.getAccountBalance();
                 result.bybit = {
                     success: bybitInfo.success,
-                    data: bybitInfo.success ? bybitInfo.data : null,
+                    data: bybitInfo.success ? bybitInfo.result : null,
                     error: bybitInfo.success ? null : bybitInfo.error,
                     hasCredentials: this.bybitService.hasCredentials
                 };
@@ -145,7 +145,7 @@ class UnifiedExchangeService {
      */
     async getTradingStatus() {
         try {
-            const accountInfo = await this.getAccountBalance();
+            const accountInfo = await this.getAccountBalancence();
             const marketAnalysis = await this.getMarketAnalysis(['BTCUSDT']);
 
             return {
@@ -156,17 +156,116 @@ class UnifiedExchangeService {
                 exchanges: {
                     bybit: {
                         available: true,
-                        status: 'connected'
+                        status: accountInfo.bybit?.success ? 'connected' : 'disconnected',
+                        hasCredentials: this.bybitService.hasCredentials
                     },
                     binance: {
                         available: true,
-                        status: 'connected'
+                        status: accountInfo.binance?.success ? 'connected' : 'disconnected',
+                        hasCredentials: this.binanceService.hasCredentials
                     }
                 },
                 timestamp: new Date().toISOString()
             };
         } catch (error) {
             console.error('❌ Trading status error:', error);
+            return {
+                success: false,
+                error: error.message,
+                timestamp: new Date().toISOString()
+            };
+        }
+    }
+
+    /**
+     * Place order on specified exchange
+     */
+    async placeOrder(exchange, orderParams) {
+        try {
+            if (exchange.toLowerCase() === 'bybit') {
+                return await this.bybitService.placeOrder(orderParams);
+            } else if (exchange.toLowerCase() === 'binance') {
+                return await this.binanceService.placeOrder(orderParams);
+            } else {
+                return {
+                    success: false,
+                    error: `Exchange ${exchange} not supported`
+                };
+            }
+        } catch (error) {
+            console.error(`❌ Error placing order on ${exchange}:`, error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Cancel order on specified exchange
+     */
+    async cancelOrder(exchange, symbol, orderId) {
+        try {
+            if (exchange.toLowerCase() === 'bybit') {
+                return await this.bybitService.cancelOrder(symbol, orderId);
+            } else if (exchange.toLowerCase() === 'binance') {
+                return await this.binanceService.cancelOrder(symbol, orderId);
+            } else {
+                return {
+                    success: false,
+                    error: `Exchange ${exchange} not supported`
+                };
+            }
+        } catch (error) {
+            console.error(`❌ Error canceling order on ${exchange}:`, error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Get open orders from specified exchange
+     */
+    async getOpenOrders(exchange, symbol = null) {
+        try {
+            if (exchange.toLowerCase() === 'bybit') {
+                return await this.bybitService.getOpenOrders(symbol);
+            } else if (exchange.toLowerCase() === 'binance') {
+                return await this.binanceService.getOpenOrders(symbol);
+            } else {
+                return {
+                    success: false,
+                    error: `Exchange ${exchange} not supported`
+                };
+            }
+        } catch (error) {
+            console.error(`❌ Error getting open orders from ${exchange}:`, error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Test connectivity for both exchanges
+     */
+    async testConnectivity() {
+        try {
+            const bybitTest = await this.bybitService.testConnectivity();
+            const binanceTest = await this.binanceService.testConnectivity();
+
+            return {
+                success: true,
+                bybit: bybitTest,
+                binance: binanceTest,
+                overall: bybitTest.success && binanceTest.success,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            console.error('❌ Connectivity test error:', error);
             return {
                 success: false,
                 error: error.message,
